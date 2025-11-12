@@ -4,6 +4,7 @@ from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import random
 import time
+import streamlit.components.v1 as components
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -39,6 +40,10 @@ if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
 if 'panic_countdown' not in st.session_state:
     st.session_state.panic_countdown = 0
+if 'latitude' not in st.session_state:
+    st.session_state.latitude = -12.065  # valor por defecto
+if 'longitude' not in st.session_state:
+    st.session_state.longitude = -75.210  # valor por defecto
 
 # --- FUNCIONES ---
 def check_risk_zone(lat, lon):
@@ -48,6 +53,24 @@ def verificar_incidente(reporte):
     confirmaciones_necesarias = 3
     confirmaciones_actuales = random.randint(0, confirmaciones_necesarias)
     return confirmaciones_actuales >= confirmaciones_necesarias, confirmaciones_actuales
+
+# --- OBTENER UBICACIÓN DEL USUARIO ---
+def get_user_location():
+    components.html(
+        """
+        <script>
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            document.querySelector('body').dataset.latitude = latitude;
+            document.querySelector('body').dataset.longitude = longitude;
+        });
+        </script>
+        """,
+        height=0,
+    )
+
+get_user_location()  # ejecuta JS
 
 # --- PESTAÑAS ---
 st.markdown('<div style="padding:10px;">', unsafe_allow_html=True)
@@ -63,7 +86,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 
 with tab1:
     st.title("🛡️ SEGURIDAD HUANCAYO")
-    zona_riesgo = check_risk_zone(-12.065, -75.210)
+    zona_riesgo = check_risk_zone(st.session_state.latitude, st.session_state.longitude)
     st.warning(f"⚠️ Zona de riesgo: {zona_riesgo['nombre']}")
     
     col1, col2, col3 = st.columns(3)
@@ -86,7 +109,7 @@ with tab2:
     show_heatmap = st.checkbox("Mapa Calor", value=True)
     show_safe_zones = st.checkbox("Zonas Seguras", value=True)
 
-    m = folium.Map(location=[-12.065, -75.210], zoom_start=15)
+    m = folium.Map(location=[st.session_state.latitude, st.session_state.longitude], zoom_start=15)
     
     if show_heatmap:
         heat_data = [[lat, lon, 0.8 if nivel=='Alta' else 0.5 if nivel=='Media' else 0.2] for lat, lon, nivel, _ in danger_points]
@@ -118,8 +141,8 @@ with tab3:
             st.experimental_rerun()
         else:
             st.error("🚨 ¡ALERTA DE EMERGENCIA ACTIVADA!")
-            my_lat = -12.065 + random.uniform(-0.001,0.001)
-            my_lon = -75.210 + random.uniform(-0.001,0.001)
+            my_lat = st.session_state.latitude + random.uniform(-0.0005,0.0005)
+            my_lon = st.session_state.longitude + random.uniform(-0.0005,0.0005)
             st.success(f"✅ Alerta enviada\n📍 Ubicación: {my_lat:.5f}, {my_lon:.5f}")
 
 with tab4:
@@ -164,4 +187,5 @@ with tab7:
     col1, col2 = st.columns(2)
     col1.metric("PRECISIÓN", "87%", "2%")
     col2.metric("ALERTAS", "24", "+5")
+
 st.markdown('</div>', unsafe_allow_html=True)

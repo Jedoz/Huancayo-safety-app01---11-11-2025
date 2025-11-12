@@ -3,7 +3,6 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import random
-import time
 import urllib.parse
 import streamlit.components.v1 as components
 
@@ -36,7 +35,7 @@ st.markdown("""
     font-size: 20px;
     font-weight: bold;
     display: block;
-    margin: 80px auto 20px auto;
+    margin: 40px auto 20px auto;
 }
 body {
     font-family: sans-serif;
@@ -102,6 +101,26 @@ with tab1:
         st.write(f"{verified} **{incident['tipo']}** - {incident['ubicacion']}")
         st.caption(f"{incident['hora']}")
 
+    # --- BOTÓN DE PÁNICO CIRCULAR EN INICIO ---
+    st.subheader("🚨 BOTÓN DE PÁNICO")
+    st.subheader("📞 CONTACTO DE EMERGENCIA")
+    emergency_number = st.text_input("Número de emergencia (WhatsApp)", st.session_state.emergency_number)
+    st.session_state.emergency_number = emergency_number
+
+    st.markdown("""
+    <form action="#" method="get">
+    <button id="panic-button">🚨</button>
+    </form>
+    """, unsafe_allow_html=True)
+
+    if st.button("Activar Pánico") or st.session_state.panic_triggered:
+        st.session_state.panic_triggered = True
+        my_lat = st.session_state.latitude + random.uniform(-0.0005,0.0005)
+        my_lon = st.session_state.longitude + random.uniform(-0.0005,0.0005)
+        message = f"🚨 ALERTA DE EMERGENCIA\n📍 Ubicación: https://www.google.com/maps/search/?api=1&query={my_lat},{my_lon}"
+        st.success("✅ Alerta enviada. Redirigiendo a WhatsApp...")
+        send_whatsapp_message(st.session_state.emergency_number, message)
+
 # ---------------- PESTAÑA 2: MAPA ----------------
 with tab2:
     st.title("🗺️ MAPA DE SEGURIDAD")
@@ -126,24 +145,8 @@ with tab2:
 
 # ---------------- PESTAÑA 3: PÁNICO ----------------
 with tab3:
-    st.title("🚨 BOTÓN DE PÁNICO")
-    st.subheader("📞 CONTACTO DE EMERGENCIA")
-    emergency_number = st.text_input("Número de emergencia (WhatsApp)", st.session_state.emergency_number)
-    st.session_state.emergency_number = emergency_number
-
-    st.markdown("""
-    <form action="#" method="get">
-    <button id="panic-button">🚨</button>
-    </form>
-    """, unsafe_allow_html=True)
-
-    if st.button("Activar Pánico") or st.session_state.panic_triggered:
-        st.session_state.panic_triggered = True
-        my_lat = st.session_state.latitude + random.uniform(-0.0005,0.0005)
-        my_lon = st.session_state.longitude + random.uniform(-0.0005,0.0005)
-        message = f"🚨 ALERTA DE EMERGENCIA\n📍 Ubicación: https://www.google.com/maps/search/?api=1&query={my_lat},{my_lon}"
-        st.success("✅ Alerta enviada. Redirigiendo a WhatsApp...")
-        send_whatsapp_message(st.session_state.emergency_number, message)
+    st.title("🚨 PÁNICO")
+    st.info("El botón de pánico principal está en la pestaña Inicio.")
 
 # ---------------- PESTAÑA 4: REPORTAR ----------------
 with tab4:

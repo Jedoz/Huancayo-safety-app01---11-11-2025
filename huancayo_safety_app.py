@@ -379,7 +379,4 @@ elif page == "ANÁLISIS":
 
 # --- INSTRUCCIONES ---
 st.sidebar.markdown("---")
-st.sidebar.info("""
-**EJECUTAR:**
-```bash
-streamlit run huancayo_safety_app.py
+st.sidebar.info("EJECUTAR: streamlit run huancayo_safety_app.py")

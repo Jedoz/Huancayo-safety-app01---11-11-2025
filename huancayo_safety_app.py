@@ -3,11 +3,9 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import datetime
-import webbrowser
-import requests
 import urllib.parse
-from geopy.geocoders import Nominatim
-import time
+from streamlit.components.v1 import html
+import requests
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -16,24 +14,21 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- INICIALIZACIÓN DE SESIÓN ---
+# --- SESIÓN ---
 if 'user_location' not in st.session_state:
     st.session_state.user_location = {"lat": -12.065, "lon": -75.210, "city": "Huancayo"}
 if 'emergency_number' not in st.session_state:
     st.session_state.emergency_number = "+51999888777"
-if 'location_method' not in st.session_state:
-    st.session_state.location_method = "manual"
 if 'gps_permission' not in st.session_state:
     st.session_state.gps_permission = False
 if 'gps_attempted' not in st.session_state:
     st.session_state.gps_attempted = False
 
 # --- COMPONENTE JAVASCRIPT PARA GPS EN TIEMPO REAL ---
-def gps_permission_component():
-    """Componente JavaScript para solicitar permisos de GPS"""
-    
-    gps_js = """
+def create_gps_script():
+    return """
     <script>
+    // Función para solicitar GPS
     function requestGPSPermission() {
         if (!navigator.geolocation) {
             alert("❌ Tu navegador no soporta geolocalización");
@@ -81,12 +76,6 @@ def gps_permission_component():
                 }
                 
                 alert(errorMsg);
-                
-                // Enviar error a Streamlit
-                window.parent.postMessage({
-                    type: 'streamlit:setComponentValue',
-                    value: JSON.stringify({error: true, message: errorMsg})
-                }, '*');
             },
             {
                 enableHighAccuracy: true,  // GPS de alta precisión
@@ -94,23 +83,21 @@ def gps_permission_component():
                 maximumAge: 0             // No usar ubicación cacheada
             }
         );
-        
         return true;
     }
-    
+
     // Función para monitoreo continuo de GPS
     function startContinuousGPS() {
         if (!navigator.geolocation) return;
         
-        const watchId = navigator.geolocation.watchPosition(
+        return navigator.geolocation.watchPosition(
             function(position) {
                 const liveData = {
                     lat: position.coords.latitude,
                     lon: position.coords.longitude,
                     accuracy: position.coords.accuracy,
                     timestamp: new Date().toISOString(),
-                    source: "gps_continuous",
-                    watchId: watchId
+                    source: "gps_continuous"
                 };
                 
                 // Actualizar ubicación en tiempo real
@@ -128,17 +115,16 @@ def gps_permission_component():
                 maximumAge: 0
             }
         );
-        
-        return watchId;
     }
+
+    // Ejecutar automáticamente al cargar (opcional)
+    // setTimeout(requestGPSPermission, 1000);
     </script>
     """
-    
-    return gps_js
 
-# --- FUNCIONES MEJORADAS CON GPS ---
+# --- FUNCIONES DE UBICACIÓN ---
 def get_location_by_ip():
-    """Obtiene ubicación por IP"""
+    """Obtiene ubicación por IP como fallback"""
     try:
         response = requests.get('https://ipapi.co/json/', timeout=10)
         if response.status_code == 200:
@@ -154,81 +140,73 @@ def get_location_by_ip():
         pass
     return None
 
-def get_address_from_coords(lat, lon):
-    """Convierte coordenadas a dirección"""
-    try:
-        geolocator = Nominatim(user_agent="huancayo_safety_app")
-        location = geolocator.reverse(f"{lat}, {lon}", language='es')
-        return location.address if location else f"Coordenadas: {lat:.4f}, {lon:.4f}"
-    except:
-        return f"Coordenadas: {lat:.4f}, {lon:.4f}"
+def create_whatsapp_link(number, message):
+    """Crea el enlace de WhatsApp"""
+    encoded_message = urllib.parse.quote(message)
+    whatsapp_url = f"https://wa.me/{number.replace('+', '')}?text={encoded_message}"
+    return whatsapp_url
 
-def trigger_whatsapp_emergency(location_data):
+def trigger_whatsapp_emergency():
     """Envía alerta de WhatsApp con ubicación"""
-    try:
-        maps_url = f"https://maps.google.com/?q={location_data['lat']},{location_data['lon']}"
-        address = get_address_from_coords(location_data['lat'], location_data['lon'])
-        
-        # Determinar precisión del mensaje
-        accuracy_note = ""
-        if location_data.get('source') == 'gps_live':
-            accuracy_note = "🎯 PRECISIÓN GPS ALTA"
-        elif location_data.get('source') == 'gps_continuous':
-            accuracy_note = "🎯 GPS EN TIEMPO REAL"
-        elif location_data.get('method') == 'ip':
-            accuracy_note = "📡 UBICACIÓN APROXIMADA"
-        else:
-            accuracy_note = "🗺️ UBICACIÓN MANUAL"
-        
-        emergency_message = (
-            f"🚨 *¡EMERGENCIA! NECESITO AYUDA URGENTE* 🚨\n\n"
-            f"📍 *Ubicación:* {address}\n"
-            f"📱 *App:* Huancayo Safety App\n"
-            f"🕐 *Hora:* {datetime.datetime.now().strftime('%H:%M:%S')}\n"
-            f"🎯 *Tipo:* {accuracy_note}\n"
-            f"📏 *Precisión:* ±{location_data.get('accuracy', 50)} metros\n\n"
-            f"🗺️ *Enlace GPS:* {maps_url}\n\n"
-            f"¡POR FAVOR ENVÍEN AYUDA INMEDIATA!"
-        )
-        
-        encoded_message = urllib.parse.quote(emergency_message)
-        whatsapp_url = f"https://wa.me/{st.session_state.emergency_number.replace('+', '')}?text={encoded_message}"
-        
-        webbrowser.open(whatsapp_url)
-        
-        # Guardar en log
-        with open("emergency_log.txt", "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.datetime.now()}] EMERGENCIA_GPS - {location_data}\n")
-        
-        return True
-        
-    except Exception as e:
-        st.error(f"Error al enviar alerta: {str(e)}")
-        return False
+    location = st.session_state.user_location
+    
+    # Determinar precisión del mensaje
+    if location.get('source') in ['gps_live', 'gps_continuous']:
+        accuracy_note = "🎯 PRECISIÓN GPS ALTA"
+        accuracy_meters = f"±{location.get('accuracy', 15)} metros"
+    elif location.get('method') == 'ip':
+        accuracy_note = "📡 UBICACIÓN APROXIMADA"
+        accuracy_meters = "±1-2 km"
+    else:
+        accuracy_note = "🗺️ UBICACIÓN MANUAL"
+        accuracy_meters = "Ubicación establecida"
+
+    emergency_message = (
+        f"🚨 *¡EMERGENCIA! NECESITO AYUDA URGENTE* 🚨\n\n"
+        f"📍 *Ubicación:* https://maps.google.com/?q={location['lat']},{location['lon']}\n"
+        f"📱 *App:* Huancayo Safety App\n"
+        f"🕐 *Hora:* {datetime.datetime.now().strftime('%H:%M:%S')}\n"
+        f"🎯 *Tipo:* {accuracy_note}\n"
+        f"📏 *Precisión:* {accuracy_meters}\n\n"
+        f"¡POR FAVOR ENVÍEN AYUDA INMEDIATA!"
+    )
+    
+    whatsapp_link = create_whatsapp_link(st.session_state.emergency_number, emergency_message)
+    
+    # Guardar en log
+    with open("emergency_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.datetime.now()}] EMERGENCIA - {location}\n")
+    
+    return whatsapp_link, emergency_message
 
 # --- COMPONENTE DE SOLICITUD DE GPS ---
 def gps_permission_section():
     """Sección para solicitar permisos de GPS"""
     
-    st.markdown("### 📍 Permisos de Ubicación en Tiempo Real")
+    st.markdown("### 📍 Activación de GPS en Tiempo Real")
     
     # Inyectar el JavaScript del GPS
-    html(gps_permission_component(), height=0)
+    html(create_gps_script(), height=0)
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.markdown("""
         **🎯 GPS en Tiempo Real:**
-        - Ubicación precisa con ±10 metros
+        - Ubicación precisa con ±10-50 metros
         - Monitoreo continuo de tu posición
         - Alertas con coordenadas exactas
         - Funciona incluso en movimiento
+        
+        **📱 En tu teléfono:**
+        1. Presiona 'Activar GPS'
+        2. Permite el acceso a ubicación
+        3. ¡Listo! Tu GPS estará activo
         """)
     
     with col2:
         # Botón para solicitar permisos de GPS
-        if st.button("📍 Permitir GPS", 
+        if st.button("📍 Activar GPS", 
                     key="gps_permission_btn",
                     use_container_width=True,
                     type="primary"):
@@ -248,47 +226,19 @@ def gps_permission_section():
     
     # Estado del GPS
     st.markdown("---")
-    if st.session_state.gps_permission:
+    if st.session_state.user_location.get('source') in ['gps_live', 'gps_continuous']:
         st.success("✅ **GPS ACTIVADO** - Tu ubicación en tiempo real está siendo monitoreada")
     elif st.session_state.gps_attempted:
         st.warning("⚠️ **GPS PENDIENTE** - Por favor permite la ubicación en tu navegador")
     else:
-        st.info("📡 **SIN GPS** - Presiona 'Permitir GPS' para activar ubicación precisa")
+        st.info("📡 **SIN GPS** - Presiona 'Activar GPS' para ubicación precisa")
 
-# --- MANEJO DE DATOS DEL GPS ---
-def handle_gps_data():
-    """Maneja los datos recibidos del componente GPS"""
+# --- MÉTODOS ALTERNATIVOS DE UBICACIÓN ---
+def alternative_location_methods():
+    """Métodos alternativos si el GPS falla"""
     
-    # Simulación de datos GPS (en producción esto vendría del componente JavaScript)
-    if st.button("🎯 Simular Datos GPS (Para pruebas)"):
-        st.session_state.user_location = {
-            "lat": -12.065123, 
-            "lon": -75.210456,
-            "city": "Huancayo Centro (GPS)",
-            "accuracy": 15,
-            "source": "gps_live",
-            "method": "gps"
-        }
-        st.session_state.gps_permission = True
-        st.success("✅ Datos GPS simulados - Ubicación de alta precisión activada")
-        st.rerun()
-
-# --- COMPONENTE PRINCIPAL DE UBICACIÓN ---
-def setup_location():
-    """Configuración completa de ubicación"""
+    st.markdown("#### 🗺️ Métodos Alternativos")
     
-    st.markdown("### 📍 Configuración de Ubicación")
-    
-    # Sección de GPS en tiempo real
-    gps_permission_section()
-    
-    # Manejo de datos GPS
-    handle_gps_data()
-    
-    st.markdown("---")
-    st.markdown("#### 🗺️ Métodos Alternativos de Ubicación")
-    
-    # Métodos alternativos
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -297,7 +247,6 @@ def setup_location():
                 location = get_location_by_ip()
                 if location:
                     st.session_state.user_location = location
-                    st.session_state.location_method = "ip"
                     st.success(f"📍 Ubicación IP: {location['city']}")
                     st.rerun()
                 else:
@@ -312,7 +261,6 @@ def setup_location():
                 "method": "manual",
                 "accuracy": 1000
             }
-            st.session_state.location_method = "manual"
             st.success("📍 Ubicación: Huancayo Centro")
             st.rerun()
     
@@ -324,7 +272,7 @@ def setup_location():
             "Estadio": (-12.072, -75.198)
         }
         
-        selected_loc = st.selectbox("Zonas:", list(ubicaciones.keys()))
+        selected_loc = st.selectbox("Zonas conocidas:", list(ubicaciones.keys()))
         if st.button("🎯 Ir aquí", use_container_width=True):
             lat, lon = ubicaciones[selected_loc]
             st.session_state.user_location = {
@@ -336,43 +284,6 @@ def setup_location():
             }
             st.success(f"📍 Ubicación: {selected_loc}")
             st.rerun()
-    
-    # Mostrar estado actual de ubicación
-    st.markdown("---")
-    loc = st.session_state.user_location
-    
-    # Determinar icono y color según el método
-    if loc.get('source') in ['gps_live', 'gps_continuous']:
-        badge_color = "#1b5e20"
-        border_color = "#4caf50"
-        icon = "🎯"
-        precision_text = f"±{loc.get('accuracy', 15)} metros"
-    elif loc.get('method') == 'ip':
-        badge_color = "#ff6f00"
-        border_color = "#ff9800"
-        icon = "📡"
-        precision_text = "±1-2 km"
-    else:
-        badge_color = "#1565c0"
-        border_color = "#2196f3"
-        icon = "🗺️"
-        precision_text = "Ubicación manual"
-    
-    st.markdown(f"""
-    <div style='
-        background: {badge_color}; 
-        color: white; 
-        padding: 15px; 
-        border-radius: 10px; 
-        text-align: center;
-        border: 2px solid {border_color};
-        margin: 10px 0;
-    '>
-        <strong>{icon} UBICACIÓN ACTUAL</strong><br>
-        <span style='font-size: 16px;'>📍 {loc['city']}</span><br>
-        <span style='font-size: 12px;'>📏 {precision_text} | Lat: {loc['lat']:.6f}, Lon: {loc['lon']:.6f}</span>
-    </div>
-    """, unsafe_allow_html=True)
 
 # --- CSS MEJORADO ---
 st.markdown("""
@@ -419,8 +330,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 15px;
         font-weight: bold;
-        text-align: center;
-        margin: 5px 0;
     }
     .metric-card {
         background: linear-gradient(135deg, #112d4e, #1e3a5f);
@@ -429,6 +338,15 @@ st.markdown("""
         text-align: center;
         margin: 5px;
         border: 1px solid #3a506b;
+    }
+    .location-badge {
+        background: #1b5e20;
+        color: #a5d6a7;
+        padding: 12px;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px solid #4caf50;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -456,54 +374,169 @@ if menu == "🏠 Inicio":
     st.markdown('<div class="main-title">🛡️ SEGURIDAD HUANCAYO</div>', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#88d3fa; font-size:18px;">GPS en Tiempo Real Activado</p>', unsafe_allow_html=True)
     
-    # Configuración de ubicación con GPS
-    setup_location()
+    # Sección de GPS
+    gps_permission_section()
+    
+    # Métodos alternativos
+    alternative_location_methods()
+    
+    # Mostrar estado actual de ubicación
+    st.markdown("---")
+    loc = st.session_state.user_location
+    
+    # Determinar icono y color según el método
+    if loc.get('source') in ['gps_live', 'gps_continuous']:
+        badge_color = "#1b5e20"
+        border_color = "#4caf50"
+        icon = "🎯"
+        precision_text = f"±{loc.get('accuracy', 15)} metros - GPS ACTIVO"
+    elif loc.get('method') == 'ip':
+        badge_color = "#ff6f00"
+        border_color = "#ff9800"
+        icon = "📡"
+        precision_text = "±1-2 km - Por IP"
+    else:
+        badge_color = "#1565c0"
+        border_color = "#2196f3"
+        icon = "🗺️"
+        precision_text = "Ubicación manual"
+    
+    st.markdown(f"""
+    <div class="location-badge">
+        <strong>{icon} UBICACIÓN ACTUAL</strong><br>
+        <span style='font-size: 16px;'>📍 {loc['city']}</span><br>
+        <span style='font-size: 12px;'>📏 {precision_text}</span><br>
+        <span style='font-size: 10px;'>Lat: {loc['lat']:.6f}, Lon: {loc['lon']:.6f}</span>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Botón de pánico principal
-    st.markdown("### 🚨 Botón de Emergencia con GPS")
+    st.markdown("### 🚨 Botón de Emergencia")
     
-    # Información de ubicación actual
-    loc = st.session_state.user_location
-    if loc.get('source') in ['gps_live', 'gps_continuous']:
-        st.success("✅ **GPS ACTIVO** - Tu ubicación exacta se enviará en la alerta")
-    elif loc.get('method') == 'ip':
-        st.warning("⚠️ **UBICACIÓN APROXIMADA** - Activa GPS para mayor precisión")
-    else:
-        st.info("🗺️ **UBICACIÓN MANUAL** - Considera activar GPS para emergencias")
-    
-    # Botón de pánico
     if st.button("🚨\nEMERGENCIA INMEDIATA\n\n"
-                "📍 Tu ubicación se enviará automáticamente\n"
-                "📱 Alerta a tu contacto de emergencia\n"
+                "📍 Tu ubicación EXACTA se enviará\n"
+                "📱 Alerta a contacto de emergencia\n"
                 "🎯 Máxima precisión con GPS", 
                 key="panic_button",
                 use_container_width=True):
         
-        if trigger_whatsapp_emergency(st.session_state.user_location):
-            st.success("""
-            ✅ **¡ALERTA ENVIADA CON ÉXITO!**
-            
-            **Se ha enviado a tu contacto de emergencia:**
-            - 🎯 Tu ubicación exacta con GPS
-            - 🗺️ Enlace directo a Google Maps
-            - 📱 Mensaje de emergencia detallado
-            - ⏰ Hora y precisión de la ubicación
-            
-            **🔒 Mantén la calma y busca un lugar seguro**
-            """)
-            st.balloons()
-            
-            # Mostrar detalles técnicos
-            with st.expander("📋 Detalles técnicos de la alerta"):
-                st.write(f"**📍 Coordenadas GPS:** {loc['lat']:.6f}, {loc['lon']:.6f}")
-                st.write(f"**🎯 Precisión:** ±{loc.get('accuracy', 50)} metros")
-                st.write(f"**📡 Método:** {loc.get('source', loc.get('method', 'Manual'))}")
-                st.write(f"**🏙️ Dirección:** {get_address_from_coords(loc['lat'], loc['lon'])}")
-                st.write(f"**📞 Contacto:** {st.session_state.emergency_number}")
-                st.write(f"**🕐 Hora de envío:** {datetime.datetime.now().strftime('%H:%M:%S')}")
+        whatsapp_link, message = trigger_whatsapp_emergency()
+        
+        st.success("""
+        ✅ **¡ALERTA GENERADA CON ÉXITO!**
+        
+        **Se ha preparado tu mensaje de emergencia:**
+        - 🎯 Tu ubicación exacta incluida
+        - 📱 Enlace de WhatsApp listo
+        - ⏰ Hora y precisión registradas
+        """)
+        st.balloons()
+        
+        # Mostrar el enlace de WhatsApp
+        st.markdown(f"""
+        <div style='
+            background: #25D366; 
+            color: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            text-align: center;
+            margin: 15px 0;
+            border: 3px solid #ffffff;
+        '>
+            <h3>📱 ENLACE DE WHATSAPP LISTO</h3>
+            <p>¡Haz clic en el botón de abajo para abrir WhatsApp!</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Botón para abrir WhatsApp
+        st.markdown(f'<a href="{whatsapp_link}" target="_blank"><button style="background:#25D366;color:white;padding:20px;border:none;border-radius:10px;font-size:20px;font-weight:bold;width:100%;">📱 ABRIR WHATSAPP Y ENVIAR ALERTA</button></a>', unsafe_allow_html=True)
+        
+        # Instrucciones adicionales
+        st.markdown("""
+        ### 📲 Si usas en teléfono:
+        1. **Presiona el botón verde de arriba**
+        2. **Se abrirá WhatsApp automáticamente**
+        3. **Verás el mensaje de emergencia listo**
+        4. **Solo presiona ENVIAR**
+        """)
+        
+        # Mostrar detalles del mensaje
+        with st.expander("📋 Ver mensaje completo que se enviará"):
+            st.text_area("", value=message, height=200, key="message_preview")
 
-# --- RESTANTE DEL CÓDIGO (Mapa, Reportar, Zonas Seguras, Perfil) ---
-# ... (el resto del código se mantiene igual que en la versión anterior)
+# --- MAPA MEJORADO ---
+elif menu == "🗺️ Mapa":
+    st.header("🗺️ Mapa de Seguridad en Tiempo Real")
+    
+    # Crear mapa centrado en la ubicación del usuario
+    m = folium.Map(
+        location=[st.session_state.user_location["lat"], st.session_state.user_location["lon"]], 
+        zoom_start=15,
+        tiles="OpenStreetMap"
+    )
+    
+    # Marcador de la ubicación del usuario
+    folium.Marker(
+        [st.session_state.user_location["lat"], st.session_state.user_location["lon"]],
+        popup="📍 TÚ ESTÁS AQUÍ",
+        tooltip="Tu ubicación actual",
+        icon=folium.Icon(color="blue", icon="user", prefix="fa")
+    ).add_to(m)
+    
+    # Círculo de precisión si es GPS
+    if st.session_state.user_location.get('source') in ['gps_live', 'gps_continuous']:
+        accuracy = st.session_state.user_location.get('accuracy', 50)
+        folium.Circle(
+            location=[st.session_state.user_location["lat"], st.session_state.user_location["lon"]],
+            radius=accuracy,
+            popup=f"Precisión: ~{accuracy}m",
+            color="blue",
+            fillColor="lightblue",
+            fillOpacity=0.2
+        ).add_to(m)
+    
+    # Heatmap de zonas peligrosas
+    heat_data = [[lat, lon, 0.8 if nivel=='Alta' else 0.5 if nivel=='Media' else 0.2] 
+                for lat, lon, nivel, _ in danger_points]
+    HeatMap(heat_data, radius=15, blur=10).add_to(m)
+    
+    # Zonas seguras
+    for lat, lon, nombre, horario, icono in safe_locations:
+        folium.Marker(
+            [lat, lon],
+            popup=f"{icono} {nombre}\n⏰ {horario}",
+            tooltip=f"Zona Segura: {nombre}",
+            icon=folium.Icon(color="green", icon="home", prefix="fa")
+        ).add_to(m)
+    
+    # Mostrar mapa
+    st_folium(m, width=700, height=500)
+
+# --- PÁGINAS RESTANTES (IGUAL QUE TU VERSIÓN ORIGINAL) ---
+elif menu == "📢 Reportar":
+    st.header("📢 REPORTAR INCIDENTE")
+    with st.form("report_form"):
+        tipo = st.selectbox("Tipo de incidente", ["Robo","Acoso","Sospechoso","Asalto","Accidente","Otro"])
+        ubicacion = st.text_input("Ubicación aproximada", "Ej. Av. Ferrocarril")
+        descripcion = st.text_area("Describe lo sucedido")
+        if st.form_submit_button("📤 ENVIAR"):
+            with open("logs_emergencias.txt", "a", encoding="utf-8") as f:
+                f.write(f"[{datetime.datetime.now()}] Reporte: {tipo}, {ubicacion}, {descripcion}\n")
+            st.success("Reporte enviado correctamente ✅")
+
+elif menu == "🛡️ Zonas Seguras":
+    st.header("🏪 ZONAS SEGURAS")
+    for lat, lon, nombre, horario, icono in safe_locations:
+        st.markdown(f"{icono} **{nombre}** — ⏰ {horario}")
+
+elif menu == "👤 Perfil":
+    st.header("👤 PERFIL DE USUARIO")
+    with st.form("perfil_form"):
+        nombre = st.text_input("Nombre", "Usuario")
+        telefono = st.text_input("Número de emergencia", st.session_state.emergency_number)
+        if st.form_submit_button("💾 Guardar"):
+            st.session_state.emergency_number = telefono
+            st.success("Perfil actualizado ✅")
 
 # --- PIE DE PÁGINA ---
 st.markdown("""

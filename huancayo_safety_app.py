@@ -38,27 +38,27 @@ recent_incidents = [
 # --- ESTILOS CSS ---
 st.markdown("""
 <style>
-    .stApp { max-width: 390px; height: 844px; margin: 0 auto; padding: 0; background: #0d1b2a; color: #ffffff; }
+    .stApp { max-width: 390px; height: 844px; margin: 0 auto; padding: 0; background: #0d1b2a; color: #ffffff; font-family: 'Arial'; }
     .panic-button {
         background: linear-gradient(135deg, #1abc9c, #16a085);
         color: #ffffff;
         border-radius: 50%;
-        width: 180px;
-        height: 180px;
-        font-size: 28px;
+        width: 220px;
+        height: 220px;
+        font-size: 32px;
         font-weight: bold;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 50px auto;
-        box-shadow: 0 0 25px #1abc9c;
-        border: 3px solid #ffffff;
+        margin: 40px auto;
+        box-shadow: 0 0 35px #1abc9c;
+        border: 4px solid #ffffff;
         transition: transform 0.2s;
     }
-    .panic-button:hover { transform: scale(1.1); }
-    .metric-card { background: #112d3c; padding: 8px; border-radius: 8px; text-align: center; font-size: 11px; margin:5px 0;}
-    .warning-alert { background: #e63946; color: #ffffff; padding: 12px; border-radius: 8px; margin: 8px 0; font-size: 14px; }
-    .safe-zone { background: #1f4068; padding: 10px; border-radius: 8px; margin: 6px 0; color: #ffffff;}
+    .panic-button:hover { transform: scale(1.15); }
+    .metric-card { background: #112d3c; padding: 10px; border-radius: 8px; text-align: center; font-size: 12px; margin:5px 0; color: #ffffff;}
+    .warning-alert { background: #e63946; color: #ffffff; padding: 14px; border-radius: 8px; margin: 10px 0; font-size: 15px; font-weight: bold;}
+    .safe-zone { background: #1f4068; padding: 12px; border-radius: 8px; margin: 6px 0; color: #ffffff; font-weight:bold;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,7 +72,12 @@ if 'emergency_number' not in st.session_state:
 def check_risk_zone(lat, lon):
     return {'nombre': 'Av. Ferrocarril', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
-def trigger_whatsapp(number, message):
+def trigger_whatsapp(number, lat, lon):
+    message = (
+        "🚨 *¡EMERGENCIA! NECESITO AYUDA AHORA!* 🚨\n"
+        f"📍 Mi ubicación actual: https://maps.google.com/?q={lat},{lon}\n"
+        "Por favor, acude inmediatamente, mi seguridad está en riesgo!"
+    )
     url = f"https://wa.me/{number.replace('+','')}/?text={message}"
     webbrowser.open(url)
 
@@ -96,8 +101,7 @@ with tabs[0]:
     
     # Botón de pánico gigante
     if st.button("🚨 PÁNICO", key="panic_main"):
-        message = f"🚨 EMERGENCIA! Ubicación aproximada: https://maps.google.com/?q=-12.065,-75.210"
-        trigger_whatsapp(st.session_state.emergency_number, message)
+        trigger_whatsapp(st.session_state.emergency_number, -12.065, -75.210)
         st.session_state.panic_active = True
         st.success("¡Alerta enviada a WhatsApp!")
 
@@ -165,4 +169,3 @@ with tabs[5]:
     - Parques nocturnos: 45% más reportes de acoso
     - Transporte público: 60% riesgo en horas pico
     """)
-

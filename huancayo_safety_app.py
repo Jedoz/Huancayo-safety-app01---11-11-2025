@@ -13,7 +13,7 @@ import math
 st.set_page_config(
     page_title="SECURE MAP HUANCAYO",
     page_icon="🚨",
-    layout="wide",  # Cambiado a wide para mejor responsive
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
@@ -181,6 +181,13 @@ st.markdown("""
         backdrop-filter: blur(5px);
     }
     
+    /* MAPA CON TAMAÑO FIJO */
+    .folium-map {
+        border-radius: 15px;
+        border: 2px solid #39ff14;
+        box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+    }
+    
     /* OCULTAR ELEMENTOS NO DESEADOS */
     footer { visibility: hidden; }
     .stDeployButton { display: none; }
@@ -234,6 +241,8 @@ if 'dynamic_map_points' not in st.session_state:
     ]
 if 'analysis_last_update' not in st.session_state:
     st.session_state.analysis_last_update = time.time()
+if 'map_key' not in st.session_state:
+    st.session_state.map_key = str(time.time())  # Key único para el mapa
 
 # Ubicación fija UTP
 st.session_state.location = {"status": "success", "lat": UTP_LAT, "lon": UTP_LON}
@@ -257,7 +266,7 @@ def log_new_incident():
     MIN_INCIDENTS = 5
 
     if CURRENT_TIME > st.session_state.last_log_time + MIN_INTERVAL_SECONDS:
-        # Lógica de simulación de incidentes (se mantiene igual)
+        # Lógica de simulación de incidentes
         if len(st.session_state.dynamic_map_points) > MIN_INCIDENTS and random.random() < 0.3:
             index_to_remove = random.randint(0, len(st.session_state.dynamic_map_points) - 1)
             _, _, _, _, loc_name = st.session_state.dynamic_map_points.pop(index_to_remove)
@@ -284,6 +293,7 @@ def log_new_incident():
             st.session_state.incident_logs.pop()
             
         st.session_state.last_log_time = CURRENT_TIME
+        st.session_state.map_key = str(time.time())  # Actualizar key del mapa
         return True
     return False
 
@@ -394,47 +404,111 @@ with st.container():
         
         # Logs de incidentes
         st.subheader("📋 REGISTRO DE ACTIVIDAD")
-        for log in st.session_state.incident_logs[:8]:  # Mostrar solo 8 logs
+        for log in st.session_state.incident_logs[:8]:
             st.markdown(f'<div class="dynamic-log-item">{log}</div>', unsafe_allow_html=True)
     
-    # --- OTRAS PESTAÑAS (MANTIENEN SU FUNCIONALIDAD) ---
+    # --- PESTAÑA MAPA CORREGIDA ---
     with tabs[1]:
         st.subheader("🗺️ MAPA DE SEGURIDAD EN TIEMPO REAL")
-        map_center = [st.session_state.location['lat'], st.session_state.location['lon']]
-        m = folium.Map(location=map_center, zoom_start=15, tiles="CartoDB dark_matter")
         
-        # Marcador del usuario
+        # Controles del mapa
+        col1, col2 = st.columns(2)
+        with col1:
+            show_heatmap = st.checkbox("Mostrar Mapa de Calor", value=True)
+        with col2:
+            show_safe_zones = st.checkbox("Mostrar Zonas Seguras", value=True)
+        
+        # CREAR EL MAPA CON KEY ÚNICO
+        map_center = [st.session_state.location['lat'], st.session_state.location['lon']]
+        m = folium.Map(
+            location=map_center, 
+            zoom_start=15, 
+            tiles="CartoDB dark_matter",
+            width='100%', 
+            height='100%'
+        )
+        
+        # Marcador del usuario (posición fija UTP)
         folium.Marker(
-            [st.session_state.location['lat'], st.session_state.location['lon']],
-            popup="¡TÚ ESTÁS AQUÍ! (UTP)",
+            map_center,
+            popup="""
+                <div style="font-family: Arial; text-align: center;">
+                    <strong>¡TÚ ESTÁS AQUÍ!</strong><br>
+                    📍 UTP Huancayo<br>
+                    🕒 Hora: """ + datetime.now().strftime('%H:%M:%S') + """<br>
+                    🔒 Estado: Seguro
+                </div>
+            """,
+            tooltip="Tu ubicación actual",
             icon=folium.Icon(color="blue", icon="user", prefix='fa')
         ).add_to(m)
         
-        # Heatmap
-        heat_data = [[lat, lon, 1.0 if nivel=='Critica' else 0.8 if nivel=='Alta' else 0.5 if nivel=='Media' else 0.2] 
-                    for lat, lon, nivel, _, _ in st.session_state.dynamic_map_points]
-        HeatMap(heat_data, radius=20, blur=15).add_to(m)
+        # Heatmap de incidentes
+        if show_heatmap and st.session_state.dynamic_map_points:
+            heat_data = []
+            for lat, lon, nivel, _, _ in st.session_state.dynamic_map_points:
+                intensity = 1.0 if nivel == 'Critica' else 0.8 if nivel == 'Alta' else 0.5 if nivel == 'Media' else 0.2
+                heat_data.append([lat, lon, intensity])
+            
+            HeatMap(heat_data, radius=20, blur=15, gradient={
+                0.2: 'blue',
+                0.4: 'cyan',
+                0.6: 'lime',
+                0.8: 'yellow',
+                1.0: 'red'
+            }).add_to(m)
         
-        # Puntos de incidentes
+        # Puntos de incidentes individuales
         for lat, lon, nivel, tipo, location_name in st.session_state.dynamic_map_points:
-            color = "darkred" if nivel=="Critica" else "red" if nivel=="Alta" else "orange" if nivel=="Media" else "yellow"
+            color = "darkred" if nivel == "Critica" else "red" if nivel == "Alta" else "orange" if nivel == "Media" else "yellow"
+            
             folium.CircleMarker(
-                [lat, lon], 
-                radius=8 if nivel=="Critica" else 6, 
-                popup=f"⚠️ {tipo} ({nivel}) - {location_name}", 
-                color=color, 
-                fill=True, 
-                fill_color=color
+                [lat, lon],
+                radius=10 if nivel == "Critica" else 8 if nivel == "Alta" else 6 if nivel == "Media" else 4,
+                popup=f"""
+                    <div style="font-family: Arial;">
+                        <strong>⚠️ {tipo}</strong><br>
+                        Nivel: <b>{nivel}</b><br>
+                        Ubicación: {location_name}<br>
+                        Hora: {datetime.now().strftime('%H:%M')}
+                    </div>
+                """,
+                tooltip=f"{tipo} - {nivel}",
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.7,
+                weight=2
             ).add_to(m)
         
         # Zonas seguras
-        for lat, lon, nombre, horario in safe_locations:
-            folium.Marker([lat, lon], popup=f"🏪 {nombre} ({horario})", 
-                         icon=folium.Icon(color="green", icon="shield", prefix='fa')).add_to(m)
+        if show_safe_zones:
+            for lat, lon, nombre, horario in safe_locations:
+                folium.Marker(
+                    [lat, lon],
+                    popup=f"""
+                        <div style="font-family: Arial; text-align: center;">
+                            <strong>🏪 {nombre}</strong><br>
+                            ⏰ {horario}<br>
+                            📍 Zona Segura Verificada
+                        </div>
+                    """,
+                    tooltip=f"Zona Segura: {nombre}",
+                    icon=folium.Icon(color="green", icon="shield", prefix='fa')
+                ).add_to(m)
         
-        st_folium(m, width=700, height=500)
+        # MOSTRAR EL MAPA CON KEY ÚNICO PARA ACTUALIZACIÓN
+        map_data = st_folium(
+            m, 
+            width=700, 
+            height=500, 
+            key=st.session_state.map_key  # KEY ÚNICO PARA ACTUALIZACIÓN
+        )
+        
+        # Información del mapa
+        st.caption(f"📍 **Ubicación central:** UTP Huancayo | 📊 **Incidentes activos:** {len(st.session_state.dynamic_map_points)} | 🕒 **Actualizado:** {datetime.now().strftime('%H:%M:%S')}")
     
-    # Las demás pestañas mantienen su funcionalidad original...
+    # --- OTRAS PESTAÑAS ---
     with tabs[2]:
         st.subheader("📢 REPORTAR INCIDENTE")
         with st.form("report_form"):
@@ -466,12 +540,24 @@ with st.container():
     
     with tabs[5]:
         st.subheader("🧠 ANÁLISIS PREDICTIVO")
-        # Análisis en tiempo real...
-        st.info("🔍 Sistema de análisis en desarrollo...")
-        st.metric("Nivel de riesgo actual", "MODERADO", delta="-2%")
+        st.info("🔍 Sistema de análisis en tiempo real activo")
+        
+        # Métricas en tiempo real
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Riesgo Actual", "MODERADO", "-2%")
+        with col2:
+            st.metric("Incidentes Activos", len(st.session_state.dynamic_map_points))
+        with col3:
+            st.metric("Tiempo Respuesta", "45s", "5s")
+        
+        # Análisis simulado
+        st.markdown('<div class="analysis-item">🌦️ <strong>CONDICIONES ACTUALES</strong>Clima favorable. Visibilidad óptima para vigilancia.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="analysis-item">🛡️ <strong>ZONAS SEGURAS</strong>Todas las comisarías operativas. Hospital Regional con capacidad.</div>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ACTUALIZACIÓN AUTOMÁTICA ---
+# --- ACTUALIZACIÓN AUTOMÁTICA EN STREAMLIT CLOUD ---
 if time.time() - st.session_state.last_log_time > 20:
     log_new_incident()
+    st.rerun()  # Esto fuerza la actualización en Streamlit Cloud

@@ -1,4 +1,3 @@
-git add .
-git commit -m "Versión minimalista corregida"
-git push
-streamlit run huancayo_safety_app.py
+streamlit>=1.28.0
+folium>=0.14.0
+streamlit-folium>=0.15.1

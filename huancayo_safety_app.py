@@ -12,7 +12,7 @@ import json
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="SECURE MAP HUANCAYO",
+    page_title="Secure Map Huancayo",
     page_icon="🚨",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -59,8 +59,8 @@ def gps_component():
         </style>
     </head>
     <body>
-        <div id="status"></div>
-        <button onclick="getLocation()">📍 OBTENER MI UBICACIÓN Y HORA ACTUAL</button>
+        <div id="status" class="status warning">🕐 Solicitando acceso a ubicación...</div>
+        <button onclick="getLocation()">📍 OBTENER MI UBICACIÓN ACTUAL</button>
         
         <script>
         function updateStatus(message, type) {
@@ -70,7 +70,7 @@ def gps_component():
         }
         
         function getLocation() {
-            updateStatus('🕐 Solicitando permisos de ubicación y hora...', 'warning');
+            updateStatus('📍 Solicitando permisos de ubicación...', 'warning');
             
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -94,7 +94,7 @@ def gps_component():
                             })
                         }, '*');
                         
-                        updateStatus('✅ Ubicación y hora obtenidas correctamente!', 'success');
+                        updateStatus('✅ Ubicación obtenida correctamente!', 'success');
                     },
                     function(error) {
                         let errorMessage = '❌ Error al obtener ubicación: ';
@@ -175,13 +175,13 @@ safe_locations = [
 st.markdown("""
 <style>
     /* Importar fuente moderna */
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
     
     /* ESTILOS GENERALES MEJORADOS */
     .stApp {
         background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
         color: #ffffff;
-        font-family: 'Share Tech Mono', monospace;
+        font-family: 'Inter', sans-serif;
         max-width: 390px;
         min-height: 844px;
         margin: 10px auto;
@@ -193,30 +193,32 @@ st.markdown("""
         position: relative;
     }
     
-    /* HEADER PERSONALIZADO CON NOMBRE DEL PROYECTO */
+    /* HEADER FORMAL Y ELEGANTE */
     .main-header {
-        background: linear-gradient(90deg, #ff0000, #ff6b6b, #ff0000);
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         padding: 20px 0;
         text-align: center;
         margin-bottom: 15px;
-        border-bottom: 3px solid #39ff14;
-        animation: header-glow 2s infinite alternate;
-    }
-    
-    @keyframes header-glow {
-        0% { box-shadow: 0 0 20px #ff0000; }
-        100% { box-shadow: 0 0 40px #ff6b6b; }
+        border-bottom: 3px solid #00A693;
     }
     
     .app-title {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 1.8rem !important;
-        font-weight: 900;
+        font-family: 'Inter', sans-serif;
+        font-size: 1.6rem !important;
+        font-weight: 700;
         color: white;
-        text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14;
         margin: 0;
         padding: 0;
-        letter-spacing: 1px;
+        letter-spacing: 0.5px;
+    }
+    
+    .app-subtitle {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.9rem !important;
+        font-weight: 400;
+        color: #e0e0e0;
+        margin: 5px 0 0 0;
+        opacity: 0.9;
     }
     
     /* BOTÓN DE PÁNICO MEJORADO */
@@ -229,141 +231,144 @@ st.markdown("""
     }
     
     .stButton > button[kind="primary"] {
-        background: linear-gradient(45deg, #ff0000, #ff6b6b, #ff0000);
+        background: linear-gradient(135deg, #ff0000, #cc0000);
         color: white;
         border: none;
-        border-radius: 50px;
+        border-radius: 15px;
         width: 100%;
         height: 80px;
-        font-size: 1.4rem;
-        font-weight: bold;
-        font-family: 'Orbitron', sans-serif;
+        font-size: 1.3rem;
+        font-weight: 700;
+        font-family: 'Inter', sans-serif;
         margin: 0 auto;
         display: block;
-        animation: panic-pulse 1.5s infinite;
-        box-shadow: 0 0 30px rgba(255, 0, 0, 0.6);
+        animation: panic-pulse 2s infinite;
+        box-shadow: 0 8px 25px rgba(255, 0, 0, 0.4);
         transition: all 0.3s ease;
-        text-shadow: 0 0 10px white;
+        letter-spacing: 0.5px;
     }
     
     @keyframes panic-pulse {
-        0% { transform: scale(1); box-shadow: 0 0 30px rgba(255, 0, 0, 0.6); }
-        50% { transform: scale(1.05); box-shadow: 0 0 50px rgba(255, 0, 0, 0.9); }
-        100% { transform: scale(1); box-shadow: 0 0 30px rgba(255, 0, 0, 0.6); }
+        0% { transform: scale(1); box-shadow: 0 8px 25px rgba(255, 0, 0, 0.4); }
+        50% { transform: scale(1.02); box-shadow: 0 12px 35px rgba(255, 0, 0, 0.6); }
+        100% { transform: scale(1); box-shadow: 0 8px 25px rgba(255, 0, 0, 0.4); }
     }
     
     .stButton > button[kind="primary"]:hover {
-        transform: scale(1.08);
-        background: linear-gradient(45deg, #ff0000, #ff4444, #ff0000);
+        transform: scale(1.03);
+        background: linear-gradient(135deg, #ff0000, #b30000);
         animation: none;
     }
     
-    /* PESTAÑAS MEJORADAS */
+    /* PESTAÑAS ELEGANTES */
     .stTabs [data-testid="stTabs"] {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding: 5px;
-        margin: 10px 0;
+        border-radius: 12px;
+        padding: 4px;
+        margin: 15px 0;
     }
     
     .stTabs [data-testid="stTabs"] button {
-        font-size: 16px !important;
-        padding: 12px 8px !important;
-        border-radius: 12px !important;
+        font-size: 14px !important;
+        padding: 10px 6px !important;
+        border-radius: 10px !important;
         transition: all 0.3s ease;
-        border: 2px solid #00FFFF !important;
-        color: #00FFFF !important;
-        background: rgba(0, 255, 255, 0.1) !important;
+        border: 1px solid rgba(0, 255, 255, 0.3) !important;
+        color: #e0e0e0 !important;
+        background: transparent !important;
         flex-grow: 1;
-        margin: 0 3px;
-        font-weight: bold;
+        margin: 0 2px;
+        font-weight: 500;
     }
     
     .stTabs [data-testid="stTabs"] button:hover {
-        background: rgba(0, 255, 255, 0.3) !important;
-        transform: translateY(-2px);
+        background: rgba(0, 255, 255, 0.1) !important;
+        border-color: #00A693 !important;
     }
     
     .stTabs [data-testid="stTabs"] button[aria-selected="true"] {
-        color: #0a0a0f !important;
-        background: linear-gradient(45deg, #00FFFF, #00E4C9) !important;
-        font-weight: bold;
-        box-shadow: 0 0 15px #00FFFF;
+        color: #ffffff !important;
+        background: linear-gradient(135deg, #00A693, #008975) !important;
+        font-weight: 600;
+        border-color: #00A693 !important;
+        box-shadow: 0 4px 15px rgba(0, 167, 147, 0.3);
     }
     
     /* CONTENEDORES MEJORADOS */
     .dynamic-log-container {
         max-height: 250px;
         overflow-y: auto;
-        border: 1px solid #005f5f;
-        padding: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 12px;
         border-radius: 12px;
         margin-bottom: 20px;
-        background: rgba(13, 27, 42, 0.8);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
     }
     
     .dynamic-log-title {
-        color: #00f0ff;
-        font-size: 16px;
-        font-weight: bold;
+        color: #00A693;
+        font-size: 15px;
+        font-weight: 600;
         margin-bottom: 10px;
         text-align: center;
     }
     
     .dynamic-log-item {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
         padding: 10px;
         border-radius: 8px;
-        color: #ffffff;
+        color: #e0e0e0;
         font-size: 13px;
-        border-left: 4px solid #ff00ff;
+        border-left: 3px solid #00A693;
         margin-bottom: 8px;
-        backdrop-filter: blur(10px);
+        font-family: 'Share Tech Mono', monospace;
     }
     
     .metric-card {
         padding: 12px;
         border-radius: 12px;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
         text-align: center;
-        border: 1px solid rgba(57, 255, 20, 0.4);
+        border: 1px solid rgba(0, 167, 147, 0.3);
         font-size: 12px;
         color: #ffffff;
         backdrop-filter: blur(10px);
     }
     
     .analysis-item {
-        background: rgba(17, 45, 60, 0.8);
+        background: rgba(255, 255, 255, 0.08);
         padding: 15px;
         border-radius: 12px;
         margin-bottom: 12px;
-        border-left: 5px solid #39ff14;
-        color: #ffffff;
+        border-left: 4px solid #00A693;
+        color: #e0e0e0;
         font-size: 14px;
-        backdrop-filter: blur(5px);
     }
     
     /* ESTADOS GPS */
     .gps-status-ready {
-        background: linear-gradient(45deg, #00b894, #55efc4);
-        color: #2d3436;
+        background: linear-gradient(135deg, #00b894, #00a085);
+        color: white;
         padding: 12px;
         border-radius: 10px;
         text-align: center;
         margin: 10px 0;
-        font-weight: bold;
-        border: 2px solid #39ff14;
+        font-weight: 600;
+        border: 1px solid #00A693;
+        font-size: 14px;
     }
     
     .gps-status-waiting {
-        background: linear-gradient(45deg, #fdcb6e, #ffeaa7);
+        background: linear-gradient(135deg, #fdcb6e, #f9a825);
         color: #2d3436;
         padding: 12px;
         border-radius: 10px;
         text-align: center;
         margin: 10px 0;
-        font-weight: bold;
-        border: 2px solid #fdcb6e;
+        font-weight: 600;
+        border: 1px solid #fdcb6e;
+        font-size: 14px;
     }
     
     /* ALERTA DE SIRENA MEJORADA */
@@ -371,29 +376,50 @@ st.markdown("""
         padding: 25px;
         margin: 20px 0;
         text-align: center;
-        font-size: 1.8rem;
-        font-weight: bold;
+        font-size: 1.6rem;
+        font-weight: 700;
         color: white;
         border-radius: 15px;
-        animation: siren-flash 0.5s infinite alternate;
-        font-family: 'Orbitron', sans-serif;
-        text-shadow: 0 0 10px white;
-        border: 3px solid #ff0000;
+        animation: siren-flash 0.8s infinite alternate;
+        font-family: 'Inter', sans-serif;
+        border: 2px solid #ff0000;
+        background: linear-gradient(135deg, #ff0000, #cc0000);
     }
     
     @keyframes siren-flash {
         0% { 
-            background-color: #ff0000; 
-            box-shadow: 0 0 30px #ff0000; 
-        }
-        50% { 
-            background-color: #0000ff; 
-            box-shadow: 0 0 30px #0000ff; 
+            background: linear-gradient(135deg, #ff0000, #cc0000);
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.6);
         }
         100% { 
-            background-color: #ff0000; 
-            box-shadow: 0 0 30px #ff0000; 
+            background: linear-gradient(135deg, #b30000, #990000);
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.8);
         }
+    }
+    
+    /* SUGERENCIAS DE RUTA */
+    .route-suggestion {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 15px;
+        border-radius: 12px;
+        margin: 10px 0;
+        border-left: 4px solid #00A693;
+    }
+    
+    .route-warning {
+        background: rgba(255, 193, 7, 0.1);
+        padding: 15px;
+        border-radius: 12px;
+        margin: 10px 0;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .route-danger {
+        background: rgba(220, 53, 69, 0.1);
+        padding: 15px;
+        border-radius: 12px;
+        margin: 10px 0;
+        border-left: 4px solid #dc3545;
     }
     
     /* OCULTAR ELEMENTOS NO DESEADOS */
@@ -430,8 +456,8 @@ if 'gps_attempted' not in st.session_state:
 
 if 'incident_logs' not in st.session_state:
     st.session_state.incident_logs = [
-        f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 SECURE MAP HUANCAYO INICIADO",
-        f"[{datetime.now().strftime('%H:%M:%S')}] 📍 Esperando acceso a GPS..."
+        f"[{datetime.now().strftime('%H:%M:%S')}] Sistema Secure Map Huancayo iniciado",
+        f"[{datetime.now().strftime('%H:%M:%S')}] Esperando acceso a GPS..."
     ]
 if 'last_log_time' not in st.session_state:
     st.session_state.last_log_time = time.time()
@@ -447,11 +473,16 @@ def get_random_location_name():
     return random.choice(HUANCAYO_STREETS)
 
 def generate_random_huancayo_point():
-    # Generar puntos alrededor del centro de Huancayo
-    center_lat = -12.022
-    center_lon = -75.233
-    random_lat = center_lat + random.uniform(-0.03, 0.03)
-    random_lon = center_lon + random.uniform(-0.03, 0.03)
+    # Generar puntos alrededor de la ubicación actual del usuario
+    if st.session_state.gps_location:
+        center_lat = st.session_state.gps_location['lat']
+        center_lon = st.session_state.gps_location['lon']
+    else:
+        center_lat = -12.022
+        center_lon = -75.233
+    
+    random_lat = center_lat + random.uniform(-0.02, 0.02)
+    random_lon = center_lon + random.uniform(-0.02, 0.02)
     nivel = random.choice(['Baja', 'Media', 'Alta', 'Critica'])
     incident_type, _ = random.choice(INCIDENT_TEMPLATES)
     location_name = get_random_location_name()
@@ -459,8 +490,8 @@ def generate_random_huancayo_point():
 
 def log_new_incident():
     CURRENT_TIME = time.time()
-    MIN_INTERVAL_SECONDS = 20
-    MAX_INCIDENTS = 15
+    MIN_INTERVAL_SECONDS = 25
+    MAX_INCIDENTS = 12
     MIN_INCIDENTS = 3
 
     if CURRENT_TIME > st.session_state.last_log_time + MIN_INTERVAL_SECONDS:
@@ -469,14 +500,14 @@ def log_new_incident():
             index_to_remove = random.randint(0, len(st.session_state.dynamic_map_points) - 1)
             _, _, _, _, loc_name = st.session_state.dynamic_map_points.pop(index_to_remove)
             report_time_str = datetime.now().strftime('%H:%M:%S')
-            new_log = f"[{report_time_str}] ✅ RESOLUCIÓN: Incidente cerca de {loc_name} resuelto"
+            new_log = f"[{report_time_str}] Resuelto: Incidente cerca de {loc_name}"
             st.session_state.incident_logs.insert(0, new_log)
         
         if st.session_state.dynamic_map_points and random.random() < 0.4:
             index_to_update = random.randint(0, len(st.session_state.dynamic_map_points) - 1)
             old_lat, old_lon, old_nivel, old_tipo, old_loc_name = st.session_state.dynamic_map_points[index_to_update]
-            new_lat = old_lat + random.uniform(-0.001, 0.001)
-            new_lon = old_lon + random.uniform(-0.001, 0.001)
+            new_lat = old_lat + random.uniform(-0.0008, 0.0008)
+            new_lon = old_lon + random.uniform(-0.0008, 0.0008)
             new_nivel = random.choice(['Baja', 'Media', 'Alta', 'Critica'])
             st.session_state.dynamic_map_points[index_to_update] = (new_lat, new_lon, new_nivel, old_tipo, old_loc_name)
 
@@ -484,7 +515,7 @@ def log_new_incident():
             lat, lon, nivel, incident, location_name = generate_random_huancayo_point()
             st.session_state.dynamic_map_points.insert(0, (lat, lon, nivel, incident, location_name))
             report_time_str = (datetime.now() - timedelta(seconds=random.randint(1, 5))).strftime('%H:%M:%S')
-            new_log = f"[{report_time_str}] 🆕 REGISTRO {nivel.upper()}: {incident} en {location_name}"
+            new_log = f"[{report_time_str}] {nivel.upper()}: {incident} en {location_name}"
             st.session_state.incident_logs.insert(0, new_log)
 
         if len(st.session_state.incident_logs) > 8:
@@ -493,6 +524,46 @@ def log_new_incident():
         st.session_state.last_log_time = CURRENT_TIME
         return True
     return False
+
+def get_route_suggestions():
+    """Genera sugerencias de ruta basadas en la ubicación actual"""
+    if not st.session_state.gps_location:
+        return []
+    
+    user_lat = st.session_state.gps_location['lat']
+    user_lon = st.session_state.gps_location['lon']
+    suggestions = []
+    
+    # Calcular distancia a zonas de riesgo
+    for incident in st.session_state.dynamic_map_points:
+        lat, lon, nivel, tipo, loc_name = incident
+        distance = math.sqrt((user_lat - lat)**2 + (user_lon - lon)**2) * 111000  # Convertir a metros
+        
+        if distance < 500:  # Menos de 500 metros
+            if nivel in ['Alta', 'Critica']:
+                suggestions.append({
+                    "type": "danger",
+                    "message": f"🚨 Evitar: {tipo} a {int(distance)}m - {loc_name}",
+                    "suggestion": "Toma una ruta alternativa"
+                })
+            elif nivel == 'Media':
+                suggestions.append({
+                    "type": "warning", 
+                    "message": f"⚠️ Precaución: {tipo} a {int(distance)}m",
+                    "suggestion": "Mantente alerta en esta zona"
+                })
+    
+    # Sugerir zonas seguras cercanas
+    for safe_lat, safe_lon, name, schedule in safe_locations:
+        distance = math.sqrt((user_lat - safe_lat)**2 + (user_lon - safe_lon)**2) * 111000
+        if distance < 800:  # Menos de 800 metros
+            suggestions.append({
+                "type": "safe",
+                "message": f"✅ Zona segura: {name} a {int(distance)}m",
+                "suggestion": "Punto de referencia seguro cerca"
+            })
+    
+    return suggestions
 
 def generate_live_analysis():
     now = datetime.now()
@@ -505,13 +576,13 @@ def generate_live_analysis():
         analysis.append({
             "title": "ANÁLISIS NOCTURNO",
             "icon": "🌙",
-            "detail": f"Hora: {hour}:00. Riesgo incrementado 65%. Evitar calles solitarias."
+            "detail": f"Hora: {hour}:00. Riesgo incrementado. Evitar calles solitarias."
         })
     else:
         analysis.append({
-            "title": "ANÁLISIS DIURNO",
+            "title": "ANÁLISIS DIURNO", 
             "icon": "☀️",
-            "detail": f"Hora: {hour}:00. Condiciones normales. Mantener precauciones básicas."
+            "detail": f"Hora: {hour}:00. Condiciones normales. Mantener precauciones."
         })
     
     # Análisis de incidentes activos
@@ -520,7 +591,7 @@ def generate_live_analysis():
         analysis.append({
             "title": "ALERTAS ACTIVAS",
             "icon": "🚨",
-            "detail": f"{high_risk_count} zonas de alto riesgo identificadas. Navegar con precaución."
+            "detail": f"{high_risk_count} zonas de alto riesgo identificadas."
         })
     
     return analysis
@@ -543,7 +614,7 @@ def generate_whatsapp_url(number, lat, lon, user_name, medical_info, local_time)
         "*⚠️ ALERTA DE PÁNICO ACTIVADA - ASISTENCIA URGENTE REQUERIDA* \n"
         "*🚨 PROCEDER A LA UBICACIÓN INMEDIATAMENTE* \n\n"
         
-        "_Sistema de Alerta SECURE MAP HUANCAYO - GPS EN VIVO_"
+        "_Sistema de Alerta Secure Map Huancayo - GPS en vivo_"
     )
     
     message_encoded = urllib.parse.quote(message)
@@ -577,53 +648,67 @@ def auto_request_gps():
                         'localTime': data.get('localTime', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     }
                     st.session_state.incident_logs.insert(0, 
-                        f"[{datetime.now().strftime('%H:%M:%S')}] ✅ GPS ACTIVO: Ubicación obtenida"
+                        f"[{datetime.now().strftime('%H:%M:%S')}] GPS activo: Ubicación obtenida"
                     )
                     st.rerun()
                 elif data.get('error'):
                     st.session_state.incident_logs.insert(0, 
-                        f"[{datetime.now().strftime('%H:%M:%S')}] ❌ GPS: {data.get('message', 'Error desconocido')}"
+                        f"[{datetime.now().strftime('%H:%M:%S')}] GPS: {data.get('message', 'Error')}"
                     )
             except Exception as e:
                 st.session_state.incident_logs.insert(0, 
-                    f"[{datetime.now().strftime('%H:%M:%S')}] ❌ GPS: Error procesando datos"
+                    f"[{datetime.now().strftime('%H:%M:%S')}] GPS: Error procesando datos"
                 )
 
 # --- 8. INTERFAZ PRINCIPAL ---
 
-# HEADER CON NOMBRE DEL PROYECTO
+# HEADER FORMAL Y ELEGANTE
 st.markdown("""
 <div class="main-header">
-    <h1 class="app-title">🚨 SECURE MAP HUANCAYO</h1>
+    <h1 class="app-title">Secure Map Huancayo</h1>
+    <div class="app-subtitle">Sistema de Seguridad en Tiempo Real</div>
 </div>
 """, unsafe_allow_html=True)
 
 # SOLICITUD AUTOMÁTICA DE GPS
 auto_request_gps()
 
-# PESTAÑAS MEJORADAS
+# PESTAÑAS ELEGANTES
 tabs = st.tabs(["🏠 INICIO", "🗺️ MAPA", "📢 REPORTAR", "🏪 ZONAS", "👤 PERFIL", "🧠 ANÁLISIS"])
 
 # ---------------- PESTAÑA INICIO ----------------
 with tabs[0]:
     # Estado GPS
     if st.session_state.gps_location:
-        local_time = st.session_state.gps_location.get('localTime', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        local_time = st.session_state.gps_location.get('localTime', datetime.now().strftime('%H:%M:%S'))
         st.markdown(f'''
         <div class="gps-status-ready">
-            📍 GPS ACTIVO | 🕒 {local_time}<br>
-            <small>Lat: {st.session_state.gps_location["lat"]:.4f} | Lon: {st.session_state.gps_location["lon"]:.4f}</small>
+            📍 Ubicación activa | 🕒 {local_time}<br>
+            <small>Precisión: ±{st.session_state.gps_location["accuracy"]:.0f}m</small>
         </div>
         ''', unsafe_allow_html=True)
         current_lat = st.session_state.gps_location['lat']
         current_lon = st.session_state.gps_location['lon']
+        
+        # Mostrar sugerencias de ruta
+        route_suggestions = get_route_suggestions()
+        if route_suggestions:
+            st.subheader("🧭 Sugerencias de Ruta")
+            for suggestion in route_suggestions[:3]:  # Mostrar máximo 3
+                if suggestion["type"] == "danger":
+                    st.markdown(f'<div class="route-danger"><strong>{suggestion["message"]}</strong><br><em>{suggestion["suggestion"]}</em></div>', unsafe_allow_html=True)
+                elif suggestion["type"] == "warning":
+                    st.markdown(f'<div class="route-warning"><strong>{suggestion["message"]}</strong><br><em>{suggestion["suggestion"]}</em></div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="route-suggestion"><strong>{suggestion["message"]}</strong><br><em>{suggestion["suggestion"]}</em></div>', unsafe_allow_html=True)
+        
     else:
-        st.markdown('<div class="gps-status-waiting">📍 SOLICITANDO ACCESO A GPS Y HORA...</div>', unsafe_allow_html=True)
+        st.markdown('<div class="gps-status-waiting">📍 Solicitando acceso a GPS...</div>', unsafe_allow_html=True)
         # Usar centro de Huancayo como fallback
         current_lat = -12.022
         current_lon = -75.233
 
-    # BOTÓN DE PÁNICO MEJORADO
+    # BOTÓN DE PÁNICO
     panic_placeholder = st.empty()
     message_placeholder = st.empty()
 
@@ -645,20 +730,20 @@ with tabs[0]:
                 
                 local_time_display = st.session_state.gps_location.get('localTime', datetime.now().strftime('%Y-%m-%d %H:%M:%S')) if st.session_state.gps_location else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 
-                with st.expander("🔗 ENLACES DE EMERGENCIA - UBICACIÓN EXACTA", expanded=True):
-                    st.warning("Los contactos recibirán tu ubicación GPS exacta y hora actual")
+                with st.expander("🔗 ENLACES DE EMERGENCIA", expanded=True):
+                    st.info("Los contactos recibirán tu ubicación GPS exacta")
                     
                     url_1 = generate_whatsapp_url(st.session_state.contact_1, current_lat, current_lon, st.session_state.user_name, st.session_state.medical_info, local_time_display)
                     if url_1:
-                        st.link_button(f"🔴 CONTACTO 1", url_1, use_container_width=True)
+                        st.link_button(f"📱 Contacto 1", url_1, use_container_width=True)
 
                     url_2 = generate_whatsapp_url(st.session_state.contact_2, current_lat, current_lon, st.session_state.user_name, st.session_state.medical_info, local_time_display)
                     if url_2:
-                        st.link_button(f"🟡 CONTACTO 2", url_2, use_container_width=True)
+                        st.link_button(f"📱 Contacto 2", url_2, use_container_width=True)
 
                     url_3 = generate_whatsapp_url(st.session_state.contact_authority, current_lat, current_lon, st.session_state.user_name, st.session_state.medical_info, local_time_display)
                     if url_3:
-                        st.link_button(f"🚔 AUTORIDADES", url_3, use_container_width=True)
+                        st.link_button(f"🚔 Autoridades", url_3, use_container_width=True)
                     
                     if st.button("✅ CANCELAR ALERTA", type="secondary", use_container_width=True):
                         cancel_alert()
@@ -667,7 +752,7 @@ with tabs[0]:
             except Exception as e:
                 message_placeholder.error(f"Error: {e}")
 
-    # LIVE FEED
+    # ACTIVIDAD EN TIEMPO REAL
     st.markdown('<div class="dynamic-log-title">📡 ACTIVIDAD EN TIEMPO REAL</div>', unsafe_allow_html=True)
     st.markdown('<div class="dynamic-log-container">', unsafe_allow_html=True)
     for log in st.session_state.incident_logs:
@@ -677,7 +762,6 @@ with tabs[0]:
     # MÉTRICAS
     high_risk_count = sum(1 for _, _, nivel, _, _ in st.session_state.dynamic_map_points if nivel in ['Alta', 'Critica'])
     incident_count = len(st.session_state.dynamic_map_points)
-    risk_level = "CRÍTICO" if high_risk_count > 3 else "ALTO" if high_risk_count > 1 else "MODERADO"
 
     col1, col2, col3 = st.columns(3)
     with col1: 
@@ -685,40 +769,52 @@ with tabs[0]:
     with col2: 
         st.markdown(f'<div class="metric-card">🛡️<br><strong>{len(safe_locations)}</strong><br>Zonas Seguras</div>', unsafe_allow_html=True)
     with col3: 
+        risk_level = "ALTO" if high_risk_count > 2 else "MEDIO" if high_risk_count > 0 else "BAJO"
         st.markdown(f'<div class="metric-card">⚠️<br><strong>{risk_level}</strong><br>Riesgo</div>', unsafe_allow_html=True)
 
 # ---------------- PESTAÑA MAPA ----------------
 with tabs[1]:
-    st.title("🗺️ MAPA DE SEGURIDAD")
+    st.title("🗺️ Mapa de Seguridad")
     
+    # El mapa se centra automáticamente en la ubicación del usuario
     map_center = [current_lat, current_lon]
     
-    show_heatmap = st.checkbox("Mapa de Calor", value=True)
-    show_safe_zones = st.checkbox("Zonas Seguras", value=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        show_heatmap = st.checkbox("Mapa de calor", value=True)
+    with col2:
+        show_safe_zones = st.checkbox("Zonas seguras", value=True)
     
-    m = folium.Map(location=map_center, zoom_start=15, tiles="CartoDB dark_matter")
+    m = folium.Map(location=map_center, zoom_start=16, tiles="CartoDB dark_matter")
     
-    # Marcador del usuario
-    user_popup = "¡TÚ ESTÁS AQUÍ! (GPS ACTIVO)" if st.session_state.gps_location else "¡TÚ ESTÁS AQUÍ! (CENTRO HUANCAYO)"
+    # Marcador del usuario con ubicación real
+    user_popup = f"""
+    <div style="font-family: Arial; text-align: center;">
+        <strong>📍 Tu ubicación actual</strong><br>
+        <small>Precisión: ±{st.session_state.gps_location['accuracy']:.0f}m</small><br>
+        <small>Hora: {datetime.now().strftime('%H:%M:%S')}</small>
+    </div>
+    """ if st.session_state.gps_location else "📍 Tu ubicación actual"
+    
     folium.Marker(
         map_center,
         popup=user_popup,
         icon=folium.Icon(color="blue", icon="user", prefix='fa')
     ).add_to(m)
 
-    # Heatmap
+    # Heatmap de incidentes
     if show_heatmap and st.session_state.dynamic_map_points:
         heat_data = [[lat, lon, 1.0 if nivel=='Critica' else 0.8 if nivel=='Alta' else 0.5 if nivel=='Media' else 0.2] 
                     for lat, lon, nivel, _, _ in st.session_state.dynamic_map_points]
         HeatMap(heat_data, radius=20, blur=15).add_to(m)
     
-    # Incidentes
+    # Incidentes individuales
     for lat, lon, nivel, tipo, location_name in st.session_state.dynamic_map_points:
         color = "darkred" if nivel=="Critica" else "red" if nivel=="Alta" else "orange" if nivel=="Media" else "yellow"
         folium.CircleMarker(
             [lat, lon], 
             radius=8 if nivel=="Critica" else 6, 
-            popup=f"⚠️ {tipo} ({nivel})", 
+            popup=f"⚠️ {tipo}<br><small>Nivel: {nivel}</small>", 
             color=color, 
             fill=True, 
             fill_color=color
@@ -727,46 +823,54 @@ with tabs[1]:
     # Zonas seguras
     if show_safe_zones:
         for lat, lon, nombre, horario in safe_locations:
-            folium.Marker([lat, lon], popup=f"🏪 {nombre}", 
+            folium.Marker([lat, lon], popup=f"🏪 {nombre}<br><small>{horario}</small>", 
                          icon=folium.Icon(color="green", icon="shield", prefix='fa')).add_to(m)
     
     st_folium(m, width=360, height=400)
+    
+    # Información del mapa
+    if st.session_state.gps_location:
+        st.caption(f"📍 Mapa centrado en tu ubicación actual | 🎯 Precisión: ±{st.session_state.gps_location['accuracy']:.0f}m")
 
 # ---------------- PESTAÑAS RESTANTES ----------------
 with tabs[2]:
-    st.title("📢 REPORTAR INCIDENTE")
+    st.title("📢 Reportar Incidente")
     with st.form("report_form"):
-        tipo_incidente = st.selectbox("Tipo", ["Robo","Acoso","Persona Sospechosa","Asalto","Accidente","Otro"])
+        tipo_incidente = st.selectbox("Tipo de incidente", ["Robo","Acoso","Persona Sospechosa","Asalto","Accidente","Otro"])
         ubicacion = st.text_input("Ubicación", f"GPS: {current_lat:.4f}, {current_lon:.4f}", disabled=True)
-        descripcion = st.text_area("Descripción")
+        descripcion = st.text_area("Descripción detallada")
         if st.form_submit_button("📤 ENVIAR REPORTE"):
             report_time = datetime.now().strftime('%H:%M:%S')
-            st.session_state.incident_logs.insert(0, f"[{report_time}] 📋 TU REPORTE: {tipo_incidente}")
+            st.session_state.incident_logs.insert(0, f"[{report_time}] 📋 Tu reporte: {tipo_incidente}")
             st.success("Reporte enviado correctamente")
 
 with tabs[3]:
-    st.title("🏪 ZONAS SEGURAS")
+    st.title("🏪 Zonas Seguras")
     for lat, lon, nombre, horario in safe_locations:
         with st.container():
             st.markdown(f"**{nombre}**")
-            st.caption(f"⏰ {horario} | 📍 {random.randint(200, 800)}m")
+            st.caption(f"⏰ {horario}")
+            if st.session_state.gps_location:
+                distance = math.sqrt((st.session_state.gps_location['lat'] - lat)**2 + 
+                                   (st.session_state.gps_location['lon'] - lon)**2) * 111000
+                st.caption(f"📍 A {int(distance)}m de tu ubicación")
             st.divider()
 
 with tabs[4]:
-    st.title("👤 PERFIL")
+    st.title("👤 Perfil de Usuario")
     with st.form("profile_form"):
-        st.session_state.user_name = st.text_input("Nombre", st.session_state.user_name) 
-        st.subheader("Contactos Emergencia")
-        st.session_state.contact_1 = st.text_input("Contacto 1", st.session_state.contact_1)
-        st.session_state.contact_2 = st.text_input("Contacto 2", st.session_state.contact_2)
+        st.session_state.user_name = st.text_input("Nombre completo", st.session_state.user_name) 
+        st.subheader("Contactos de Emergencia")
+        st.session_state.contact_1 = st.text_input("Contacto principal", st.session_state.contact_1)
+        st.session_state.contact_2 = st.text_input("Contacto secundario", st.session_state.contact_2)
         st.session_state.contact_authority = st.text_input("Autoridades", st.session_state.contact_authority)
-        st.subheader("Info Médica")
-        st.session_state.medical_info = st.text_area("Información", st.session_state.medical_info)
-        if st.form_submit_button("💾 GUARDAR"):
-            st.success("Perfil actualizado")
+        st.subheader("Información Médica")
+        st.session_state.medical_info = st.text_area("Condiciones médicas", st.session_state.medical_info)
+        if st.form_submit_button("💾 GUARDAR PERFIL"):
+            st.success("Perfil actualizado correctamente")
 
 with tabs[5]:
-    st.title("🧠 ANÁLISIS PREDICTIVO")
+    st.title("🧠 Análisis Predictivo")
     analysis_data = generate_live_analysis()
     for item in analysis_data:
         st.markdown(

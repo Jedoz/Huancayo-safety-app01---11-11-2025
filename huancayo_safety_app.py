@@ -5,10 +5,11 @@ from folium.plugins import HeatMap
 import webbrowser
 import streamlit.components.v1 as components
 import time # ¡Importante para el contador de 3 segundos!
+import urllib.parse # Para codificar el mensaje
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Huancayo Safety HUD",
+    page_title="SECURE MAP HUANCAYO", # --- ¡TÍTULO CORREGIDO! ---
     page_icon="🚨",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -150,13 +151,16 @@ st.markdown("""
         box-shadow: 0 0 10px #00f0ff;
     }
 
-    /* Estilo de Pestañas (Tabs) */
+    /* --- Estilo de Pestañas (Tabs) MEJORADO (SOLO ICONOS) --- */
     [data-baseweb="tab-list"] {
         background: #111;
+        justify-content: space-around; /* ¡NUEVO! Distribuye los iconos */
+        width: 100%;
     }
     [data-baseweb="tab"] {
         font-family: 'Share Tech Mono', monospace;
-        font-size: 14px;
+        font-size: 26px; /* ¡NUEVO! Iconos más grandes */
+        padding: 10px 0; /* Más área de click */
         background: #111;
         color: #888;
     }
@@ -178,13 +182,39 @@ st.markdown("""
         border-radius: 8px;
         border: 1px solid #005f5f;
     }
+    
+    /* Botones normales y de envío (no-pánico) */
     .stButton > button:not([kind="primary"]) {
         background: #00f0ff;
         color: #0a0a0f;
         font-family: 'Share Tech Mono', monospace;
         font-weight: bold;
+        width: 100%; /* Botones de formulario al 100% */
     }
     
+    /* Botones de enlace (NUEVO) */
+    .stLinkButton {
+        margin-bottom: 10px;
+    }
+    .stLinkButton a {
+        background-color: #00f0ff;
+        color: #0a0a0f;
+        font-family: 'Share Tech Mono', monospace;
+        font-weight: bold;
+        padding: 15px;
+        border-radius: 8px;
+        text-decoration: none;
+        display: block;
+        text-align: center;
+        font-size: 16px;
+    }
+    .stLinkButton a[data-testid="baseLinkButton-secondary"] {
+         background-color: #112d3c;
+         color: #00f0ff;
+         border: 1px solid #00f0ff;
+    }
+
+
     /* Scrollbar */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: #0a0a0f; }
@@ -197,7 +227,6 @@ st.markdown("""
 # --- 4. ESTADO DE SESIÓN ---
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
-# --- RENOMBRADO Y AÑADIDOS ---
 if 'contact_1' not in st.session_state:
     st.session_state.contact_1 = "+51999888777" # Contacto Principal
 if 'contact_2' not in st.session_state:
@@ -206,17 +235,24 @@ if 'contact_authority' not in st.session_state:
     st.session_state.contact_authority = "" # Autoridad (Opcional)
 if 'medical_info' not in st.session_state:
     st.session_state.medical_info = "Datos médicos no especificados" # Info Médica
-# --- FIN DE CAMBIOS EN SESIÓN ---
-if 'location' not in st.session_state:
-    st.session_state.location = None # Aquí guardaremos el GPS
 if 'user_name' not in st.session_state:
-    st.session_state.user_name = "Usuario Anónimo" # ¡NUEVO! Guardar el nombre del usuario
+    st.session_state.user_name = "Usuario Anónimo"
 
-# --- 5. COMPONENTE HTML/JS PARA OBTENER UBICACIÓN ---
-# Este componente usa JS para pedir la ubicación al navegador
-# y la devuelve a Streamlit usando `Streamlit.setComponentValue`
-GET_LOCATION_HTML = """
+# --- LÓGICA DE UBICACIÓN MEJORADA ---
+if 'location' not in st.session_state:
+    # Estados: pending, success, error
+    st.session_state.location = {"status": "pending"} 
+
+# --- 5. COMPONENTE HTML/JS PARA OBTENER UBICACIÓN (V2) ---
+# --- AHORA MÁS ROBUSTO, CON ALTA PRECISIÓN Y MANEJO DE ERRORES ---
+GET_LOCATION_HTML_V2 = """
 <script>
+    const options = {
+        enableHighAccuracy: true, // ¡NUEVO! Pedir alta precisión
+        timeout: 5000,            // ¡NUEVO! Timeout de 5 segundos
+        maximumAge: 0
+    };
+
     // Pedir permiso de geolocalización
     navigator.geolocation.getCurrentPosition(
         // Éxito: Enviar coordenadas a Streamlit
@@ -226,10 +262,13 @@ GET_LOCATION_HTML = """
                 "lon": position.coords.longitude
             });
         },
-        // Error: Enviar null
+        // Error: Enviar el mensaje de error
         (error) => {
-            Streamlit.setComponentValue(null);
-        }
+            Streamlit.setComponentValue({
+                "error": error.message 
+            });
+        },
+        options
     );
 </script>
 """
@@ -239,9 +278,11 @@ def check_risk_zone(lat, lon):
     # Lógica de simulación (sin cambios)
     return {'nombre': 'Av. Ferrocarril', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
-def trigger_whatsapp(contacts_to_alert, lat, lon, user_name, medical_info):
-    # MENSAJE DE ALERTA MEJORADO Y PERSONALIZADO
-    # Convertir nombre a mayúsculas para más urgencia
+# --- FUNCIÓN CAMBIADA: AHORA SOLO GENERA LA URL, NO LA ABRE ---
+def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
+    if not number or len(number) < 5:
+        return None # No hacer nada si no hay número
+        
     user_name_upper = user_name.upper()
     
     message = (
@@ -258,113 +299,131 @@ def trigger_whatsapp(contacts_to_alert, lat, lon, user_name, medical_info):
         "¡¡¡NO ES SIMULACRO!!!"
     )
     
-    import urllib.parse
     message_encoded = urllib.parse.quote(message)
-    
-    # --- LÓGICA DE ENVÍO MÚLTIPLE ---
-    urls_opened = 0
-    for number in contacts_to_alert:
-        if number and len(number) > 5: # Asegurarse que el número no esté vacío
-            number_cleaned = number.replace('+', '').replace(' ', '')
-            url = f"https://wa.me/{number_cleaned}?text={message_encoded}"
-            webbrowser.open(url)
-            urls_opened += 1
-    
-    return urls_opened
+    number_cleaned = number.replace('+', '').replace(' ', '')
+    url = f"https://wa.me/{number_cleaned}?text={message_encoded}"
+    return url
 
-# --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN ---
-# Ejecutamos el HTML/JS. El resultado (coordenadas o null) se guarda en `location_data`
-# Lo ejecutamos ANTES de las pestañas para tener la info lista
-if st.session_state.location is None:
-    location_data = components.html(GET_LOCATION_HTML, height=0)
+# --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN (LÓGICA MEJORADA) ---
+# Ejecutamos el HTML/JS solo si el estado es 'pending'
+if st.session_state.location["status"] == "pending":
+    location_data = components.html(GET_LOCATION_HTML_V2, height=0)
 
-    # --- LA CORRECCIÓN ESTÁ AQUÍ ---
-    # Verificamos que location_data sea un DICIONARIO (dict) antes de asignarlo.
-    # El error anterior era que location_data podia ser un 'DeltaGenerator'
-    # y el 'if location_data:' se evaluaba como True, guardando el objeto incorrecto.
+    # Verificamos la respuesta del componente
     if isinstance(location_data, dict):
-        st.session_state.location = location_data
-        # Forzamos un re-run para que la app se actualice con la nueva ubicación
+        if "lat" in location_data:
+            # --- ¡ÉXITO! ---
+            st.session_state.location = {
+                "status": "success",
+                "lat": location_data["lat"],
+                "lon": location_data["lon"]
+            }
+        elif "error" in location_data:
+            # --- ¡ERROR! ---
+            st.session_state.location = {
+                "status": "error",
+                "message": location_data["error"]
+            }
+        
+        # Forzamos un re-run para que la app se actualice con el nuevo estado
         st.rerun()
-    elif location_data is None:
-        # El componente devolvió 'null' (probablemente error de permisos o el usuario denegó)
-        # No hacemos nada, la app mostrará el st.warning() en la pestaña Inicio
-        pass
 
 # --- 8. PESTAÑAS (TABS) ---
+# --- ¡CAMBIO! AHORA SOLO ICONOS PARA MEJOR UI MÓVIL ---
 tabs = st.tabs([
-    "🏠 INICIO",
-    "🗺️ MAPA",
-    "📢 REPORTAR",
-    "🏪 ZONAS",
-    "👤 PERFIL",
-    "🧠 ANÁLISIS"
+    "🏠", # INICIO
+    "🗺️", # MAPA
+    "📢", # REPORTAR
+    "🏪", # ZONAS
+    "👤", # PERFIL
+    "🧠"  # ANÁLISIS
 ])
 
 # ---------------- PESTAÑA INICIO ----------------
 with tabs[0]:
-    st.title("🛡️ SAFETY HUD: HUANCAYO")
+    st.title("🛡️ SECURE MAP HUANCAYO") # --- ¡TÍTULO CORREGIDO! ---
     
-    # Mostrar estado de GPS
-    if st.session_state.location:
+    # --- Mostrar estado de GPS (MEJORADO) ---
+    if st.session_state.location["status"] == "success":
         st.markdown(f'<div class="safe-zone" style="text-align: center; background: #005f5f;">🛰️ GPS FIJADO: {st.session_state.location["lat"]:.4f}, {st.session_state.location["lon"]:.4f}</div>', unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ No se pudo obtener tu ubicación. Activa el GPS y recarga la página para usar el botón de pánico.")
+    elif st.session_state.location["status"] == "error":
+        st.error(f"⚠️ Error de GPS: {st.session_state.location['message']}. ¡Revisa permisos y recarga!")
+    elif st.session_state.location["status"] == "pending":
+        st.warning("🛰️ Obteniendo ubicación GPS... Por favor, acepta el permiso.")
 
     # Zona de riesgo (simulada)
     zona_riesgo = check_risk_zone(-12.065, -75.210)
     st.markdown(f'<div class="warning-alert">¡ALERTA! ZONA DE RIESGO: {zona_riesgo["nombre"]}</div>', unsafe_allow_html=True)
     
-    # Placeholder para el contador de 3 segundos
-    countdown_placeholder = st.empty()
+    # Placeholder para el contador y los botones de envío
+    placeholder = st.empty()
+
+    # --- ¡MEJORA DE LÓGICA! ---
+    # Comprobar si el GPS está listo ANTES de dibujar el botón
+    gps_ready = st.session_state.location["status"] == "success"
 
     # Botón de pánico GIGANTE
-    # Usamos st.button con kind="primary" para que nuestro CSS lo detecte
-    if st.button("🚨 PÁNICO 🚨", key="panic_main", type="primary"):
-        if st.session_state.location:
+    # --- ¡MEJORA! El botón se deshabilita si el GPS no está listo ---
+    if placeholder.button("🚨 PÁNICO 🚨", key="panic_main", type="primary", disabled=not gps_ready):
+        
+        # Esta lógica SÓLO se ejecuta si gps_ready era True y el usuario hizo clic
             
-            # --- CONSTRUIR LISTA DE CONTACTOS ---
-            contacts_to_alert = [
+        # --- CONSTRUIR LISTA DE CONTACTOS ---
+            contacts = [
                 st.session_state.contact_1,
                 st.session_state.contact_2,
                 st.session_state.contact_authority
             ]
             # Filtrar vacíos
-            contacts_to_alert = [c for c in contacts_to_alert if c and len(c) > 5]
+            contacts = [c for c in contacts if c and len(c) > 5]
 
             # --- VERIFICAR SI HAY CONTACTOS ---
-            if not contacts_to_alert:
-                countdown_placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
+            if not contacts:
+                placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
             else:
                 # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
                 try:
-                    # Mostrar cuenta regresiva en el placeholder
-                    countdown_placeholder.warning("Preparando alerta... 3 segundos")
-                    time.sleep(1)
-                    countdown_placeholder.warning("Preparando alerta... 2 segundos")
-                    time.sleep(1)
-                    countdown_placeholder.warning("Preparando alerta... 1 segundo")
-                    time.sleep(1)
+                    with placeholder.container(): # Contenedor para la cuenta regresiva
+                        st.warning("Preparando alerta... 3 segundos")
+                        time.sleep(1)
+                        st.warning("Preparando alerta... 2 segundos")
+                        time.sleep(1)
+                        st.warning("Preparando alerta... 1 segundo")
+                        time.sleep(1)
                     
-                    # --- ENVIAR ALERTA ---
+                    # --- OBTENER DATOS PARA MENSAJES ---
                     lat = st.session_state.location['lat']
                     lon = st.session_state.location['lon']
                     user_name = st.session_state.user_name
                     medical_info = st.session_state.medical_info
                     
-                    # ¡Enviamos los datos a la función de WhatsApp!
-                    sent_count = trigger_whatsapp(contacts_to_alert, lat, lon, user_name, medical_info)
+                    # --- ¡LÓGICA DE ENVÍO MEJORADA! ---
+                    with placeholder.container():
+                        st.success("¡ALERTA LISTA! PRESIONA PARA ENVIAR:")
+                        
+                        # Generar URL para Contacto 1
+                        url_1 = generate_whatsapp_url(st.session_state.contact_1, lat, lon, user_name, medical_info)
+                        if url_1:
+                            st.link_button(f"ENVIAR A CONTACTO 1 ({st.session_state.contact_1})", url_1, use_container_width=True, type="primary")
+
+                        # Generar URL para Contacto 2
+                        url_2 = generate_whatsapp_url(st.session_state.contact_2, lat, lon, user_name, medical_info)
+                        if url_2:
+                            st.link_button(f"ENVIAR A CONTACTO 2 ({st.session_state.contact_2})", url_2, use_container_width=True, type="secondary")
+
+                        # Generar URL para Autoridad
+                        url_3 = generate_whatsapp_url(st.session_state.contact_authority, lat, lon, user_name, medical_info)
+                        if url_3:
+                            st.link_button(f"ENVIAR A AUTORIDAD ({st.session_state.contact_authority})", url_3, use_container_width=True, type="secondary")
                     
-                    st.session_state.panic_active = True
-                    countdown_placeholder.success(f"¡Alerta de pánico enviada a {sent_count} contacto(s)!")
                     st.balloons()
 
-                except Exception as e:
-                    countdown_placeholder.error(f"Error al enviar: {e}")
-                # --- FIN: LÓGICA DE 3 SEGUNDOS ---
+                placeholder.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS. Revisa los permisos.")
 
-        else:
-            st.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS.")
+    # --- ¡NUEVO! ---
+    # Si el GPS no está listo, mostrar un error claro en lugar del botón
+    if not gps_ready:
+        st.warning("El botón de pánico está desactivado. Esperando GPS FIJADO (verde) para activarse.")
 
     # Estadísticas (HUD)
     col1, col2, col3 = st.columns(3)
@@ -377,7 +436,7 @@ with tabs[1]:
     st.title("🗺️ MAPA DE SEGURIDAD")
     
     # Centrar el mapa en la ubicación del usuario si está disponible, si no, en Huancayo
-    if st.session_state.location:
+    if st.session_state.location["status"] == "success":
         map_center = [st.session_state.location['lat'], st.session_state.location['lon']]
         zoom = 16
     else:
@@ -390,7 +449,7 @@ with tabs[1]:
     m = folium.Map(location=map_center, zoom_start=zoom, tiles="CartoDB dark_matter")
     
     # Marcador del Usuario (¡NUEVO!)
-    if st.session_state.location:
+    if st.session_state.location["status"] == "success":
         folium.Marker(
             [st.session_state.location['lat'], st.session_state.location['lon']],
             popup="¡TÚ ESTÁS AQUÍ!",
@@ -420,7 +479,7 @@ with tabs[2]:
         
         # Usar ubicación GPS si está disponible
         ubicacion_default = "Cerca de..."
-        if st.session_state.location:
+        if st.session_state.location["status"] == "success":
             ubicacion_default = f"GPS: {st.session_state.location['lat']:.5f}, {st.session_state.location['lon']:.5f}"
         
         ubicacion = st.text_input("Ubicación aproximada", ubicacion_default)
@@ -443,7 +502,6 @@ with tabs[4]:
     st.info("Tu nombre e info médica se incluirán en las alertas de pánico.")
     
     with st.form("profile_form"):
-        # ¡CAMPO DE NOMBRE AÑADIDO!
         nombre = st.text_input("Tu Nombre", st.session_state.user_name) 
         
         st.subheader("Contactos de Emergencia")
@@ -455,7 +513,6 @@ with tabs[4]:
         medical_info = st.text_area("Condiciones Médicas (Alergias, Tipo de Sangre, etc.)", st.session_state.medical_info)
         
         if st.form_submit_button("💾 GUARDAR PERFIL"):
-            # ¡GUARDAR TODOS LOS CAMPOS!
             st.session_state.user_name = nombre
             st.session_state.contact_1 = contact_1
             st.session_state.contact_2 = contact_2

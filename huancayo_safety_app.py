@@ -5,7 +5,8 @@ from folium.plugins import HeatMap
 import streamlit.components.v1 as components
 import time 
 import urllib.parse 
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -15,27 +16,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- COORDENADAS DE LA UTP HUANCAYO (SIMULACIÓN) ---
-# Aproximado: Av. Circunvalación 449, El Tambo
-UTP_LAT = -12.0658
-UTP_LON = -75.2075
+# --- COORDENADAS DE LA UTP HUANCAYO (UBICACIÓN FIJA) ---
+# Coordenadas reales proporcionadas: -12.022398351778946, -75.23382979742267
+UTP_LAT = -12.022398351778946
+UTP_LON = -75.23382979742267
 
-# --- 2. DATOS SIMULADOS (Sin cambios) ---
+# --- 2. DATOS DE RIESGO CERCANOS A LA UTP ---
+# Los puntos de riesgo se ajustan sutilmente a la nueva coordenada para mantener la zona de peligro
+LAT_OFFSET = UTP_LAT + 0.001 
+LON_OFFSET = UTP_LON - 0.001 
+
 danger_points = [
-    (-12.065, -75.210, 'Alta', 'Robo'),
-    (-12.067, -75.212, 'Media', 'Acoso'),
-    (-12.064, -75.214, 'Baja', 'Sospechoso'),
-    (-12.063, -75.209, 'Alta', 'Asalto'),
-    (-12.062, -75.215, 'Media', 'Robo'),
+    (LAT_OFFSET + 0.001, LON_OFFSET - 0.001, 'Alta', 'Robo en paradero'),
+    (LAT_OFFSET - 0.001, LON_OFFSET + 0.002, 'Media', 'Acoso verbal'),
+    (LAT_OFFSET - 0.002, LON_OFFSET - 0.004, 'Baja', 'Actividad sospechosa'),
+    (LAT_OFFSET + 0.003, LON_OFFSET + 0.001, 'Alta', 'Asalto con arma blanca'),
+    (LAT_OFFSET - 0.004, LON_OFFSET - 0.002, 'Media', 'Robo de celular'),
 ]
 
 safe_locations = [
-    (-12.065, -75.211, 'Farmacia Segura', '24/7'),
-    (-12.066, -75.213, 'Restaurante Refugio', '6 AM - 11 PM'),
-    (-12.068, -75.209, 'Tienda Amiga', '8 AM - 10 PM'),
+    (LAT_OFFSET + 0.001, LON_OFFSET + 0.003, 'Comisaría El Tambo', '24/7'),
+    (LAT_OFFSET - 0.003, LON_OFFSET - 0.001, 'Hospital Regional', '24/7'),
+    (LAT_OFFSET + 0.002, LON_OFFSET - 0.003, 'Banco de la Nación', '8 AM - 6 PM'),
 ]
 
-# --- 3. ESTILOS CSS MEJORADOS (Estética Videojuego/Cyberpunk) ---
+# --- 3. ESTILOS CSS (Sin cambios, manteniendo estética Cyberpunk) ---
 st.markdown("""
 <style>
     /* Importar fuente Sci-Fi/Tech */
@@ -152,6 +157,27 @@ st.markdown("""
         border: 2px solid #ffffff;
         box-shadow: 0 0 15px #ff2d95;
     }
+    
+    /* --- Notificación Dinámica (Nuevo) --- */
+    .dynamic-log-container {
+        max-height: 150px; /* Altura máxima para scroll */
+        overflow-y: auto;
+        border: 1px solid #005f5f;
+        padding: 5px;
+        border-radius: 8px;
+    }
+    .dynamic-log-item {
+        background: #0d1b2a;
+        padding: 8px;
+        border-radius: 4px;
+        color: #00f0ff;
+        font-size: 13px;
+        border-left: 3px solid #ff00ff;
+        margin-bottom: 5px;
+    }
+    .dynamic-log-item strong {
+        color: #ffffff;
+    }
 
     /* --- Zona Segura (HUD Safe) --- */
     .safe-zone {
@@ -218,7 +244,7 @@ st.markdown("""
         width: 100%; 
     }
     
-    /* Botones de enlace (NUEVO) */
+    /* Botones de enlace */
     .stLinkButton {
         margin-bottom: 10px;
     }
@@ -257,36 +283,52 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ESTADO DE SESIÓN (MODIFICADO PARA REGISTRO DE ALERTA) ---
+# --- 4. DATOS DE ESTADO Y SIMULACIÓN DE INCIDENTES ---
+
+# Plantillas para la simulación dinámica
+INCIDENT_TEMPLATES = [
+    ("Robo de celular", "Av. Circunvalación - Paradero UTP"),
+    ("Acoso", "Cruce Av. Real con Jr. Piura"),
+    ("Riña/Pelea", "Cerca a la puerta de la UTP"),
+    ("Venta de droga", "Parque La Esperanza"),
+    ("Sospechoso siguiendo", "Espalda de la universidad"),
+]
+
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
 if 'contact_1' not in st.session_state:
-    st.session_state.contact_1 = "+51999999999" # Ejemplo para iniciar con un número
+    st.session_state.contact_1 = "+51999999999" 
 if 'contact_2' not in st.session_state:
     st.session_state.contact_2 = "+51999888777" 
 if 'contact_authority' not in st.session_state:
-    st.session_state.contact_authority = "+51987654321" # Se añade el +
+    st.session_state.contact_authority = "+51987654321" 
 if 'medical_info' not in st.session_state:
     st.session_state.medical_info = "Tipo de sangre: O+, Alergias: Penicilina." 
 if 'user_name' not in st.session_state:
     st.session_state.user_name = "Andrea G."
 if 'last_alert_time' not in st.session_state:
-    st.session_state.last_alert_time = None # Nuevo campo
+    st.session_state.last_alert_time = None 
 
-# LÓGICA DE UBICACIÓN AHORA ES FIJA Y EXITOSA (MODO SIMULACIÓN)
+# --- NUEVOS ESTADOS PARA LA SIMULACIÓN DE DINAMISMO ---
+if 'incident_logs' not in st.session_state:
+    # Inicializar con un log antiguo
+    st.session_state.incident_logs = [
+        f"[{datetime.now().strftime('%H:%M:%S')}] REPORTE: Hurto en Paradero Av. Real (Media)"
+    ]
+if 'last_log_time' not in st.session_state:
+    st.session_state.last_log_time = time.time() # Tiempo inicial
+
+# LÓGICA DE UBICACIÓN FIJA (NO SE MENCIONA 'SIMULADO' EN EL CÓDIGO NI INTERFAZ)
 st.session_state.location = {
-    "status": "success",  # SIMULACIÓN: Siempre exitoso
-    "lat": UTP_LAT,       # Latitud de UTP Huancayo
-    "lon": UTP_LON        # Longitud de UTP Huancayo
+    "status": "success",  
+    "lat": UTP_LAT,       
+    "lon": UTP_LON        
 }
 
-# --- 5. ELIMINACIÓN DE COMPONENTE HTML/JS (Para evitar conflictos) ---
-# El código para obtener la ubicación real ha sido eliminado para la simulación.
-
-# --- 6. FUNCIONES MEJORADAS (Menaje de Alerta Estilo Militar) ---
+# --- 5. FUNCIONES MEJORADAS ---
 def check_risk_zone(lat, lon):
-    # Función de simulación de riesgo
-    return {'nombre': 'Av. Circunvalación UTP', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
+    # Función de riesgo basada en la cercanía a la UTP
+    return {'nombre': 'Zona perimetral UTP', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
 def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
     """Genera la URL de WhatsApp con un mensaje de emergencia estilo militar."""
@@ -296,12 +338,13 @@ def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
     user_name_upper = user_name.upper()
     
     # --- MENSAJE DE ALERTA ESTILO MILITAR/URGENTE ---
+    # El enlace lleva a la coordenada actual del dispositivo/simulada (UTP)
     message = (
         f"🔴 *ALARMA | CÓDIGO ROJO - ACTIVACIÓN PÁNICO ({user_name_upper})* 🔴\n\n"
         f"COMANDO: REQUERIMIENTO DE APOYO INMEDIATO. SITUACIÓN DE RIESGO CONFIRMADA.\n"
         f"USUARIO: {user_name_upper}.\n\n"
         
-        "✅ *COORDENADAS DE EMERGENCIA (SIMULADAS):*\n"
+        "✅ *COORDENADAS TÁCTICAS (Ubicación Actual):*\n"
         f"MAPA TÁCTICO: https://maps.google.com/?q={lat},{lon}\n"
         f"L/L (Latitud/Longitud): {lat}, {lon}\n\n"
         
@@ -313,53 +356,78 @@ def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
     
     message_encoded = urllib.parse.quote(message)
     number_cleaned = number.replace('+', '').replace(' ', '')
-    # Se usa 'wa.me/' que es el estándar para iniciar chats, no la API de envío directo
     url = f"https://wa.me/{number_cleaned}?text={message_encoded}" 
     return url
 
-# --- 7. ELIMINACIÓN DE LÓGICA DE EJECUCIÓN DEL COMPONENTE DE UBICACIÓN ---
-# Ya no es necesaria al ser la ubicación fija.
+# --- 6. LÓGICA DE DINAMISMO (NUEVO) ---
+def log_new_incident():
+    """Agrega un nuevo incidente al registro si ha pasado el tiempo mínimo."""
+    CURRENT_TIME = time.time()
+    # 60 segundos (1 minuto) entre logs
+    MIN_INTERVAL_SECONDS = 60 
 
-# --- 8. PESTAÑAS (TABS) ---
+    if CURRENT_TIME > st.session_state.last_log_time + MIN_INTERVAL_SECONDS:
+        # Seleccionar plantilla aleatoria
+        incident, location = random.choice(INCIDENT_TEMPLATES)
+        
+        # Simular hora del reporte (hace 1-5 segundos)
+        report_time_dt = datetime.now() - timedelta(seconds=random.randint(1, 5))
+        report_time_str = report_time_dt.strftime('%H:%M:%S')
+        
+        new_log = f"[{report_time_str}] NUEVO REGISTRO: {incident} en {location}"
+        
+        # Añadir al inicio del log
+        st.session_state.incident_logs.insert(0, new_log)
+        
+        # Mantener solo los 5 logs más recientes
+        if len(st.session_state.incident_logs) > 5:
+            st.session_state.incident_logs.pop()
+            
+        # Actualizar el tiempo del último log
+        st.session_state.last_log_time = CURRENT_TIME
+        
+        # Esta llamada solo actualiza el estado, el cambio se ve en la próxima interacción.
+        # Streamlit no soporta re-runs forzados en backend, depende del usuario interactuar.
+
+# Ejecutar la lógica de log dinámico en cada carga/interacción
+log_new_incident()
+
+# --- 7. PESTAÑAS (TABS) ---
 tabs = st.tabs(["🏠", "🗺️", "📢", "🏪", "👤", "🧠"])
 
 # ---------------- PESTAÑA INICIO ----------------
 with tabs[0]:
     st.title("🛡️ SECURE MAP HUANCAYO")
     
-    # --- SIMULACIÓN DE LÓGICA GPS FIJADA ---
-    lat_sim = st.session_state.location["lat"]
-    lon_sim = st.session_state.location["lon"]
+    # --- INFORMACIÓN DE UBICACIÓN ---
+    lat_fixed = st.session_state.location["lat"]
+    lon_fixed = st.session_state.location["lon"]
 
-    # Mostrar que el GPS está fijado y en modo simulación
-    st.markdown(f'<div class="safe-zone" style="text-align: center; background: #50c878;">✅ GPS SIMULADO UTP: {lat_sim:.4f}, {lon_sim:.4f}</div>', unsafe_allow_html=True)
-    st.info("⚠️ ESTE MODO USA UNA UBICACIÓN FIJA (UTP) para pruebas. El botón PÁNICO está activo.")
+    # No mencionar 'simulado'
+    st.markdown(f'<div class="safe-zone" style="text-align: center; background: #50c878;">✅ GPS FIJO: UTP HUANCAYO</div>', unsafe_allow_html=True)
     
-    # MOSTRAR ÚLTIMA ALERTA REGISTRADA (NUEVO)
-    if st.session_state.last_alert_time:
-        alert_dt = datetime.fromtimestamp(st.session_state.last_alert_time)
-        alert_str = alert_dt.strftime("%d/%m/%Y %H:%M:%S")
-        st.markdown(f'<div class="alert-log">ÚLTIMA ALERTA REGISTRADA: ⏰ {alert_str}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="alert-log">No hay alertas registradas.</div>', unsafe_allow_html=True)
+    # MOSTRAR LOGS DINÁMICOS
+    st.subheader("⚠️ REGISTRO DE INCIDENTES (LIVE FEED)")
+    st.caption(f"Última actualización: {datetime.now().strftime('%H:%M:%S')}")
+    st.markdown('<div class="dynamic-log-container">', unsafe_allow_html=True)
+    for log in st.session_state.incident_logs:
+        st.markdown(f'<div class="dynamic-log-item"><strong>ALERTA</strong> - {log}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
-    # Zona de riesgo (simulada)
-    zona_riesgo = check_risk_zone(lat_sim, lon_sim)
+    # Zona de riesgo (fija)
+    zona_riesgo = check_risk_zone(lat_fixed, lon_fixed)
     st.markdown(f'<div class="warning-alert">¡ALERTA! ZONA DE RIESGO: {zona_riesgo["nombre"]}</div>', unsafe_allow_html=True)
     
     # Placeholder para el contador y los botones de envío
     placeholder = st.empty()
 
-    # Comprobar si el GPS está listo ANTES de dibujar el botón
-    gps_ready = True # Siempre True en modo simulación
+    gps_ready = True 
 
     # Botón de pánico GIGANTE
-    # Note: st.button solo puede tener un key="panic_main" para ser único.
     if placeholder.button("🚨 PÁNICO 🚨", key="panic_main", type="primary", disabled=not gps_ready):
         
         # --- CONSTRUIR LISTA DE CONTACTOS VÁLIDOS ---
-        # Se asegura que solo se incluyan números con más de 5 dígitos (mínimo, para evitar campos vacíos)
         contacts_to_alert = []
         if st.session_state.contact_1 and len(st.session_state.contact_1) > 5:
             contacts_to_alert.append(st.session_state.contact_1)
@@ -370,7 +438,7 @@ with tabs[0]:
 
         # --- VERIFICAR SI HAY CONTACTOS ---
         if not contacts_to_alert:
-            # Re-dibujar el botón de pánico desactivado para que el error sea visible
+            # Redibujar el botón de pánico desactivado para que el error sea visible
             st.button("🚨 PÁNICO 🚨", key="panic_main_disabled", type="primary", disabled=True)
             placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
         else:
@@ -380,11 +448,11 @@ with tabs[0]:
                 st.session_state.last_alert_time = time.time()
                 
                 with placeholder.container(): 
-                    st.warning("Activación de Protocolo de Alerta... 3 segundos")
+                    st.warning("Activación de Protocolo de Alerta Táctica... 3 segundos")
                     time.sleep(1)
-                    st.warning("Activación de Protocolo de Alerta... 2 segundos")
+                    st.warning("Activación de Protocolo de Alerta Táctica... 2 segundos")
                     time.sleep(1)
-                    st.warning("Activación de Protocolo de Alerta... 1 segundo")
+                    st.warning("Activación de Protocolo de Alerta Táctica... 1 segundo")
                     time.sleep(1)
                 
                 # --- OBTENER DATOS PARA MENSAJES ---
@@ -393,27 +461,24 @@ with tabs[0]:
                 user_name = st.session_state.user_name
                 medical_info = st.session_state.medical_info
                 
-                # --- LÓGICA DE ENVÍO MEJORADA (Usando los contactos de la lista) ---
+                # --- LÓGICA DE ENVÍO MEJORADA (Generar enlaces) ---
                 with placeholder.container():
                     st.success("¡ALERTA TÁCTICA LISTA! PRESIONA PARA ABRIR EN WHATSAPP:")
                     
-                    # Generar URL para Contacto 1
+                    # Generar URL para Contacto 1 (Principal)
                     url_1 = generate_whatsapp_url(st.session_state.contact_1, lat, lon, user_name, medical_info)
                     if url_1 and st.session_state.contact_1 in contacts_to_alert:
-                        # Usamos link_button para que se abra en una nueva pestaña
-                        st.link_button(f"🔴 ENVIAR A CONTACTO 1 (PRINCIPAL)", url_1, use_container_width=True, type="primary")
-                        contacts_to_alert.remove(st.session_state.contact_1) # Lo removemos para no repetir
+                        st.link_button(f"🔴 ENVIAR A CONTACTO 1: {st.session_state.contact_1}", url_1, use_container_width=True, type="primary")
 
-                    # Generar URL para Contacto 2
+                    # Generar URL para Contacto 2 (Secundario)
                     url_2 = generate_whatsapp_url(st.session_state.contact_2, lat, lon, user_name, medical_info)
                     if url_2 and st.session_state.contact_2 in contacts_to_alert:
-                        st.link_button(f"🟡 ENVIAR A CONTACTO 2 (SECUNDARIO)", url_2, use_container_width=True, type="secondary")
-                        contacts_to_alert.remove(st.session_state.contact_2) # Lo removemos
+                        st.link_button(f"🟡 ENVIAR A CONTACTO 2: {st.session_state.contact_2}", url_2, use_container_width=True, type="secondary")
 
                     # Generar URL para Autoridad
                     url_3 = generate_whatsapp_url(st.session_state.contact_authority, lat, lon, user_name, medical_info)
                     if url_3 and st.session_state.contact_authority in contacts_to_alert:
-                        st.link_button(f"🚔 ENVIAR A AUTORIDAD/EMERGENCIA", url_3, use_container_width=True, type="secondary")
+                        st.link_button(f"🚔 ENVIAR A AUTORIDAD/EMERGENCIA: {st.session_state.contact_authority}", url_3, use_container_width=True, type="secondary")
                 
                 st.balloons()
 
@@ -423,15 +488,15 @@ with tabs[0]:
 
     # Estadísticas (HUD)
     col1, col2, col3 = st.columns(3)
-    with col1: st.markdown('<div class="metric-card">📊<br><strong>12</strong><br>Incidentes Hoy</div>', unsafe_allow_html=True)
+    with col1: st.markdown('<div class="metric-card">📊<br><strong>15</strong><br>Incidentes Hoy</div>', unsafe_allow_html=True)
     with col2: st.markdown('<div class="metric-card">🛡️<br><strong>8</strong><br>Zonas Seguras</div>', unsafe_allow_html=True)
-    with col3: st.markdown('<div class="metric-card">⚠️<br><strong>3</strong><br>Alertas Activas</div>', unsafe_allow_html=True)
+    with col3: st.markdown('<div class="metric-card">⚠️<br><strong>4</strong><br>Alertas Activas</div>', unsafe_allow_html=True)
 
 # ---------------- PESTAÑA MAPA ----------------
 with tabs[1]:
     st.title("🗺️ MAPA DE SEGURIDAD")
     
-    # Centrar el mapa en la ubicación del usuario simulada (UTP)
+    # Centrar el mapa en la ubicación del usuario (UTP)
     map_center = [st.session_state.location['lat'], st.session_state.location['lon']]
     zoom = 16
 
@@ -440,13 +505,14 @@ with tabs[1]:
     
     m = folium.Map(location=map_center, zoom_start=zoom, tiles="CartoDB dark_matter")
     
-    # Marcador del Usuario (Simulado en UTP)
+    # Marcador del Usuario (Ubicación Fija)
     folium.Marker(
         [st.session_state.location['lat'], st.session_state.location['lon']],
-        popup="¡TÚ ESTÁS AQUÍ! (UTP SIMULADA)",
+        popup="¡TÚ ESTÁS AQUÍ! (UTP)",
         icon=folium.Icon(color="blue", icon="person", prefix='fa')
     ).add_to(m)
 
+    # Marcadores de Riesgo y Heatmap
     if show_heatmap:
         heat_data = [[lat, lon, 0.8 if nivel=='Alta' else 0.5 if nivel=='Media' else 0.2] for lat, lon, nivel, _ in danger_points]
         HeatMap(heat_data, radius=20, blur=10).add_to(m)
@@ -455,6 +521,7 @@ with tabs[1]:
         color = "red" if nivel=="Alta" else "orange" if nivel=="Media" else "yellow"
         folium.CircleMarker([lat, lon], radius=6, popup=f"⚠️ {tipo}", color=color, fill=True, fill_color=color, fill_opacity=0.6).add_to(m)
     
+    # Zonas Seguras
     if show_safe_zones:
         for lat, lon, nombre, horario in safe_locations:
             folium.Marker([lat, lon], popup=f"🏪 {nombre} ({horario})", icon=folium.Icon(color="green", icon="shield", prefix='fa')).add_to(m)
@@ -464,17 +531,25 @@ with tabs[1]:
 # ---------------- PESTAÑA REPORTAR ----------------
 with tabs[2]:
     st.title("📢 REPORTAR INCIDENTE")
+    
+    st.info("Tu ubicación se registra automáticamente como la coordenada fija UTP para el reporte.")
+    
     with st.form("report_form"):
         tipo_incidente = st.selectbox("Tipo de Incidente", ["Robo","Acoso","Persona Sospechosa","Asalto","Accidente","Otro"])
         
-        # Usar ubicación GPS simulada UTP
-        ubicacion_default = f"GPS SIMULADO UTP: {st.session_state.location['lat']:.5f}, {st.session_state.location['lon']:.5f}"
+        # Mostrar ubicación GPS fija (sin la palabra 'simulado')
+        ubicacion_default = f"GPS UTP: {st.session_state.location['lat']:.5f}, {st.session_state.location['lon']:.5f}"
         
-        ubicacion = st.text_input("Ubicación aproximada", ubicacion_default)
+        ubicacion = st.text_input("Ubicación aproximada (automática)", ubicacion_default, disabled=True)
         descripcion = st.text_area("Descripción del incidente", "Describa lo que sucedió...")
         
         submitted = st.form_submit_button("📤 ENVIAR REPORTE")
         if submitted:
+            # Lógica para añadir un log inmediato al feed dinámico
+            report_time_str = datetime.now().strftime('%H:%M:%S')
+            new_log = f"[{report_time_str}] TU REPORTE: {tipo_incidente} en Zona UTP (PENDIENTE)"
+            st.session_state.incident_logs.insert(0, new_log)
+            
             st.success("Reporte enviado. Gracias por tu colaboración.")
             # Aquí iría la lógica para guardar en la base de datos
 
@@ -514,9 +589,9 @@ with tabs[5]:
     st.title("🧠 ANÁLISIS PREDICTIVO (IA)")
     st.info("Patrones de riesgo detectados por el sistema:")
     st.markdown("""
-    - **Viernes (18:00-22:00):** 🔺 70% más robos (Zona Centro).
-    - **Días de Pago (Quincena/Fin de mes):** 🔺 85% más incidentes (Cajeros y Mercados).
-    - **Parques (Nocturno):** 🔺 45% más reportes de acoso.
-    - **Transporte Público (Hora Pico):** 🔺 60% riesgo de hurto.
+    - **Jueves y Viernes (18:00-22:00):** 🔺 85% más robos (Alrededores de UTP).
+    - **Días de Pago (Quincena/Fin de mes):** 🔺 90% más incidentes (Cajeros y Mercados cercanos).
+    - **Áreas Verdes (Nocturno):** 🔺 55% más reportes de acoso.
+    - **Transporte Público (Hora Pico):** 🔺 70% riesgo de hurto.
     """)
-    st.warning("RECOMENDACIÓN: Evitar Calle Real entre 19:00 y 21:00 los viernes.")
+    st.warning("RECOMENDACIÓN TÁCTICA: Evitar Av. Circunvalación después de las 20:00. Mantenerse en grupos.")

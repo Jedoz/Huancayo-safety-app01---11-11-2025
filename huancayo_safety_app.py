@@ -197,8 +197,16 @@ st.markdown("""
 # --- 4. ESTADO DE SESIÓN ---
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
-if 'emergency_number' not in st.session_state:
-    st.session_state.emergency_number = "+51999888777" # Número de emergencia
+# --- RENOMBRADO Y AÑADIDOS ---
+if 'contact_1' not in st.session_state:
+    st.session_state.contact_1 = "+51999888777" # Contacto Principal
+if 'contact_2' not in st.session_state:
+    st.session_state.contact_2 = "" # Contacto Secundario (Opcional)
+if 'contact_authority' not in st.session_state:
+    st.session_state.contact_authority = "" # Autoridad (Opcional)
+if 'medical_info' not in st.session_state:
+    st.session_state.medical_info = "Datos médicos no especificados" # Info Médica
+# --- FIN DE CAMBIOS EN SESIÓN ---
 if 'location' not in st.session_state:
     st.session_state.location = None # Aquí guardaremos el GPS
 if 'user_name' not in st.session_state:
@@ -231,7 +239,7 @@ def check_risk_zone(lat, lon):
     # Lógica de simulación (sin cambios)
     return {'nombre': 'Av. Ferrocarril', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
-def trigger_whatsapp(number, lat, lon, user_name):
+def trigger_whatsapp(contacts_to_alert, lat, lon, user_name, medical_info):
     # MENSAJE DE ALERTA MEJORADO Y PERSONALIZADO
     # Convertir nombre a mayúsculas para más urgencia
     user_name_upper = user_name.upper()
@@ -241,19 +249,28 @@ def trigger_whatsapp(number, lat, lon, user_name):
         f"¡ESTA ES UNA ALERTA DE PÁNICO REAL! ¡{user_name_upper} HA PRESIONADO EL BOTÓN DE EMERGENCIA!\n"
         "¡POR FAVOR, ACUDE O ENVÍA AYUDA DE INMEDIATO!\n\n"
         "📍 *UBICACIÓN GPS EXACTA:*\n"
-        f"https://maps.google.com/?q={lat},{lon}\n\n"
+        f"https://maps.google.com/?q={lat},{lon}\n"
         f"Latitud: {lat}\n"
         f"Longitud: {lon}\n\n"
+        "🩺 *INFORMACIÓN MÉDICA RELEVANTE:*\n"
+        f"{medical_info}\n\n"
         "¡¡¡ACTÚA RÁPIDO, ES UNA EMERGENCIA!!! "
         "¡¡¡NO ES SIMULACRO!!!"
     )
-    # URL Encode (aunque webbrowser suele manejarlo, es buena práctica)
+    
     import urllib.parse
     message_encoded = urllib.parse.quote(message)
-    url = f"https://wa.me/{number.replace('+','')}?text={message_encoded}"
     
-    # Abrir en una nueva pestaña del navegador
-    webbrowser.open(url)
+    # --- LÓGICA DE ENVÍO MÚLTIPLE ---
+    urls_opened = 0
+    for number in contacts_to_alert:
+        if number and len(number) > 5: # Asegurarse que el número no esté vacío
+            number_cleaned = number.replace('+', '').replace(' ', '')
+            url = f"https://wa.me/{number_cleaned}?text={message_encoded}"
+            webbrowser.open(url)
+            urls_opened += 1
+    
+    return urls_opened
 
 # --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN ---
 # Ejecutamos el HTML/JS. El resultado (coordenadas o null) se guarda en `location_data`
@@ -306,31 +323,45 @@ with tabs[0]:
     if st.button("🚨 PÁNICO 🚨", key="panic_main", type="primary"):
         if st.session_state.location:
             
-            # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
-            try:
-                # Mostrar cuenta regresiva en el placeholder
-                countdown_placeholder.warning("Preparando alerta... 3 segundos")
-                time.sleep(1)
-                countdown_placeholder.warning("Preparando alerta... 2 segundos")
-                time.sleep(1)
-                countdown_placeholder.warning("Preparando alerta... 1 segundo")
-                time.sleep(1)
-                
-                # --- ENVIAR ALERTA ---
-                lat = st.session_state.location['lat']
-                lon = st.session_state.location['lon']
-                user_name = st.session_state.user_name # ¡Obtenemos el nombre del perfil!
-                
-                # ¡Enviamos el nombre a la función de WhatsApp!
-                trigger_whatsapp(st.session_state.emergency_number, lat, lon, user_name)
-                
-                st.session_state.panic_active = True
-                countdown_placeholder.success("¡Alerta de pánico enviada a WhatsApp!")
-                st.balloons()
+            # --- CONSTRUIR LISTA DE CONTACTOS ---
+            contacts_to_alert = [
+                st.session_state.contact_1,
+                st.session_state.contact_2,
+                st.session_state.contact_authority
+            ]
+            # Filtrar vacíos
+            contacts_to_alert = [c for c in contacts_to_alert if c and len(c) > 5]
 
-            except Exception as e:
-                countdown_placeholder.error(f"Error al enviar: {e}")
-            # --- FIN: LÓGICA DE 3 SEGUNDOS ---
+            # --- VERIFICAR SI HAY CONTACTOS ---
+            if not contacts_to_alert:
+                countdown_placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
+            else:
+                # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
+                try:
+                    # Mostrar cuenta regresiva en el placeholder
+                    countdown_placeholder.warning("Preparando alerta... 3 segundos")
+                    time.sleep(1)
+                    countdown_placeholder.warning("Preparando alerta... 2 segundos")
+                    time.sleep(1)
+                    countdown_placeholder.warning("Preparando alerta... 1 segundo")
+                    time.sleep(1)
+                    
+                    # --- ENVIAR ALERTA ---
+                    lat = st.session_state.location['lat']
+                    lon = st.session_state.location['lon']
+                    user_name = st.session_state.user_name
+                    medical_info = st.session_state.medical_info
+                    
+                    # ¡Enviamos los datos a la función de WhatsApp!
+                    sent_count = trigger_whatsapp(contacts_to_alert, lat, lon, user_name, medical_info)
+                    
+                    st.session_state.panic_active = True
+                    countdown_placeholder.success(f"¡Alerta de pánico enviada a {sent_count} contacto(s)!")
+                    st.balloons()
+
+                except Exception as e:
+                    countdown_placeholder.error(f"Error al enviar: {e}")
+                # --- FIN: LÓGICA DE 3 SEGUNDOS ---
 
         else:
             st.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS.")
@@ -409,17 +440,27 @@ with tabs[3]:
 # ---------------- PESTAÑA PERFIL ----------------
 with tabs[4]:
     st.title("👤 PERFIL DE USUARIO")
-    st.info("Tu nombre se incluirá en las alertas de pánico.")
+    st.info("Tu nombre e info médica se incluirán en las alertas de pánico.")
     
     with st.form("profile_form"):
         # ¡CAMPO DE NOMBRE AÑADIDO!
         nombre = st.text_input("Tu Nombre", st.session_state.user_name) 
-        emergencia_num = st.text_input("Contacto de Emergencia (WhatsApp)", st.session_state.emergency_number)
+        
+        st.subheader("Contactos de Emergencia")
+        contact_1 = st.text_input("Contacto 1 (Principal)", st.session_state.contact_1)
+        contact_2 = st.text_input("Contacto 2 (Opcional)", st.session_state.contact_2)
+        contact_authority = st.text_input("Autoridad (Policía, Bomberos, etc. Opcional)", st.session_state.contact_authority)
+
+        st.subheader("Información Médica")
+        medical_info = st.text_area("Condiciones Médicas (Alergias, Tipo de Sangre, etc.)", st.session_state.medical_info)
         
         if st.form_submit_button("💾 GUARDAR PERFIL"):
-            # ¡GUARDAR AMBOS CAMPOS!
+            # ¡GUARDAR TODOS LOS CAMPOS!
             st.session_state.user_name = nombre
-            st.session_state.emergency_number = emergencia_num
+            st.session_state.contact_1 = contact_1
+            st.session_state.contact_2 = contact_2
+            st.session_state.contact_authority = contact_authority
+            st.session_state.medical_info = medical_info
             st.success("Perfil actualizado correctamente")
 
 # ---------------- PESTAÑA ANÁLISIS ----------------

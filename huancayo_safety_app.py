@@ -2,14 +2,13 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import HeatMap
-import webbrowser
 import streamlit.components.v1 as components
-import time # ¡Importante para el contador de 3 segundos!
-import urllib.parse # Para codificar el mensaje
+import time 
+import urllib.parse 
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="SECURE MAP HUANCAYO", # --- ¡TÍTULO CORREGIDO! ---
+    page_title="SECURE MAP HUANCAYO",
     page_icon="🚨",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -82,9 +81,9 @@ st.markdown("""
         background: linear-gradient(145deg, #ff2d95, #e6007e);
         color: #ffffff;
         border-radius: 50%;
-        width: 280px; /* Mucho más grande */
-        height: 280px; /* Mucho más grande */
-        font-size: 48px; /* Texto más grande */
+        width: 280px; 
+        height: 280px; 
+        font-size: 48px; 
         font-weight: bold;
         font-family: 'Share Tech Mono', monospace;
         display: flex;
@@ -115,6 +114,24 @@ st.markdown("""
         animation: none; /* Sin pulso cuando está desactivado */
     }
 
+    /* --- BOTÓN DE SOLICITUD GPS (ROJO) --- */
+    .stButton > button[key="request_gps"] {
+        background-color: #a00; /* Rojo más oscuro */
+        color: #ffffff;
+        border: 2px solid #ff2d95; /* Borde rosa */
+        border-radius: 8px;
+        font-family: 'Share Tech Mono', monospace;
+        font-weight: bold;
+        width: 100%;
+        padding: 15px;
+        box-shadow: 0 0 10px #f00;
+        transition: background-color 0.2s;
+        margin-bottom: 20px;
+    }
+    .stButton > button[key="request_gps"]:hover {
+        background-color: #c00;
+    }
+
 
     /* --- Tarjetas de Métricas (HUD) --- */
     .metric-card {
@@ -138,7 +155,7 @@ st.markdown("""
     /* --- Alerta de Zona (HUD Warning) --- */
     .warning-alert {
         background: #ff2d95; /* Neón Magenta */
-        color: #0a0a0f; /* Texto negro para máximo contraste */
+        color: #0a0a0f; 
         padding: 14px;
         border-radius: 8px;
         margin: 10px 0;
@@ -164,13 +181,13 @@ st.markdown("""
     /* --- Estilo de Pestañas (Tabs) MEJORADO (SOLO ICONOS) --- */
     [data-baseweb="tab-list"] {
         background: #111;
-        justify-content: space-around; /* ¡NUEVO! Distribuye los iconos */
+        justify-content: space-around; 
         width: 100%;
     }
     [data-baseweb="tab"] {
         font-family: 'Share Tech Mono', monospace;
-        font-size: 26px; /* ¡NUEVO! Iconos más grandes */
-        padding: 10px 0; /* Más área de click */
+        font-size: 26px; 
+        padding: 10px 0; 
         background: #111;
         color: #888;
     }
@@ -199,7 +216,7 @@ st.markdown("""
         color: #0a0a0f;
         font-family: 'Share Tech Mono', monospace;
         font-weight: bold;
-        width: 100%; /* Botones de formulario al 100% */
+        width: 100%; 
     }
     
     /* Botones de enlace (NUEVO) */
@@ -241,36 +258,39 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ESTADO DE SESIÓN ---
+# --- 4. ESTADO DE SESIÓN (NUEVO ESTADO INICIAL) ---
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
 if 'contact_1' not in st.session_state:
-    st.session_state.contact_1 = "" # Contacto Principal
+    st.session_state.contact_1 = "+51999999999" # Ejemplo
 if 'contact_2' not in st.session_state:
-    st.session_state.contact_2 = "" # Contacto Secundario (Opcional)
+    st.session_state.contact_2 = "" 
 if 'contact_authority' not in st.session_state:
-    st.session_state.contact_authority = "" # Autoridad (Opcional)
+    st.session_state.contact_authority = "" 
 if 'medical_info' not in st.session_state:
-    st.session_state.medical_info = "Datos médicos no especificados" # Info Médica
+    st.session_state.medical_info = "Datos médicos no especificados" 
 if 'user_name' not in st.session_state:
     st.session_state.user_name = "Usuario Anónimo"
 
-# --- LÓGICA DE UBICACIÓN MEJORADA ---
+# LÓGICA DE UBICACIÓN MEJORADA
 if 'location' not in st.session_state:
-    # Estados: pending, success, error
-    st.session_state.location = {"status": "pending"} 
+    # NUEVO ESTADO INICIAL: 'not_requested'
+    st.session_state.location = {"status": "not_requested"} 
+if 'location_permission_requested' not in st.session_state:
+    st.session_state.location_permission_requested = False
 
 # --- 5. COMPONENTE HTML/JS PARA OBTENER UBICACIÓN (V2) ---
-# --- AHORA MÁS ROBUSTO, CON ALTA PRECISIÓN Y MANEJO DE ERRORES ---
 GET_LOCATION_HTML_V2 = """
 <script>
     const options = {
-        enableHighAccuracy: true, // ¡NUEVO! Pedir alta precisión
-        timeout: 5000,            // ¡NUEVO! Timeout de 5 segundos
+        enableHighAccuracy: true,
+        timeout: 5000,
         maximumAge: 0
     };
 
     // Pedir permiso de geolocalización
+    // Este código se ejecuta cuando el componente se carga.
+    // Como ahora se carga después del clic del usuario, debería solicitar el permiso.
     navigator.geolocation.getCurrentPosition(
         // Éxito: Enviar coordenadas a Streamlit
         (position) => {
@@ -281,8 +301,16 @@ GET_LOCATION_HTML_V2 = """
         },
         // Error: Enviar el mensaje de error
         (error) => {
+            let errorMessage = "Permiso denegado o error desconocido.";
+            if (error.code === error.PERMISSION_DENIED) {
+                errorMessage = "Permiso de ubicación denegado por el usuario.";
+            } else if (error.code === error.POSITION_UNAVAILABLE) {
+                errorMessage = "Ubicación no disponible.";
+            } else if (error.code === error.TIMEOUT) {
+                errorMessage = "Tiempo de espera agotado para obtener ubicación.";
+            }
             Streamlit.setComponentValue({
-                "error": error.message 
+                "error": errorMessage
             });
         },
         options
@@ -290,15 +318,13 @@ GET_LOCATION_HTML_V2 = """
 </script>
 """
 
-# --- 6. FUNCIONES MEJORADAS ---
+# --- 6. FUNCIONES MEJORADAS (Sin cambios) ---
 def check_risk_zone(lat, lon):
-    # Lógica de simulación (sin cambios)
     return {'nombre': 'Av. Ferrocarril', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
-# --- FUNCIÓN CAMBIADA: AHORA SOLO GENERA LA URL, NO LA ABRE ---
 def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
     if not number or len(number) < 5:
-        return None # No hacer nada si no hay número
+        return None 
         
     user_name_upper = user_name.upper()
     
@@ -318,16 +344,25 @@ def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
     
     message_encoded = urllib.parse.quote(message)
     number_cleaned = number.replace('+', '').replace(' ', '')
-    url = f"https://wa.me/{number_cleaned}?text={message_encoded}"
+    # El API de wa.me requiere el número sin el '+'
+    url = f"https://wa.me/{number_cleaned}?text={message_encoded}" 
     return url
 
-# --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN (LÓGICA MEJORADA) ---
-# Ejecutamos el HTML/JS solo si el estado es 'pending'
-if st.session_state.location["status"] == "pending":
+# --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN (LÓGICA ACTUALIZADA) ---
+# Ejecutamos el HTML/JS solo si el permiso ha sido solicitado Y no tenemos éxito todavía
+if st.session_state.location_permission_requested and st.session_state.location["status"] != "success":
+    
+    # Si el estado actual es 'not_requested', lo cambiamos a 'pending' antes de ejecutar el JS
+    if st.session_state.location["status"] == "not_requested":
+        st.session_state.location["status"] = "pending"
+        # No hacemos rerun aquí para evitar un loop innecesario. El componente se cargará.
+    
+    # Creamos el componente HTML para ejecutar el JavaScript de geolocalización
     location_data = components.html(GET_LOCATION_HTML_V2, height=0)
 
     # Verificamos la respuesta del componente
     if isinstance(location_data, dict):
+        # SOLO si recibimos datos, procesamos y forzamos un re-run
         if "lat" in location_data:
             # --- ¡ÉXITO! ---
             st.session_state.location = {
@@ -335,38 +370,41 @@ if st.session_state.location["status"] == "pending":
                 "lat": location_data["lat"],
                 "lon": location_data["lon"]
             }
+            st.rerun()
+
         elif "error" in location_data:
             # --- ¡ERROR! ---
             st.session_state.location = {
                 "status": "error",
                 "message": location_data["error"]
             }
-        
-        # Forzamos un re-run para que la app se actualice con el nuevo estado
-        st.rerun()
+            st.rerun()
 
 # --- 8. PESTAÑAS (TABS) ---
-# --- ¡CAMBIO! AHORA SOLO ICONOS PARA MEJOR UI MÓVIL ---
-tabs = st.tabs([
-    "🏠", # INICIO
-    "🗺️", # MAPA
-    "📢", # REPORTAR
-    "🏪", # ZONAS
-    "👤", # PERFIL
-    "🧠"  # ANÁLISIS
-])
+tabs = st.tabs(["🏠", "🗺️", "📢", "🏪", "👤", "🧠"])
 
 # ---------------- PESTAÑA INICIO ----------------
 with tabs[0]:
-    st.title("🛡️ SECURE MAP HUANCAYO") # --- ¡TÍTULO CORREGIDO! ---
+    st.title("🛡️ SECURE MAP HUANCAYO")
     
-    # --- Mostrar estado de GPS (MEJORADO) ---
-    if st.session_state.location["status"] == "success":
-        st.markdown(f'<div class="safe-zone" style="text-align: center; background: #005f5f;">🛰️ GPS FIJADO: {st.session_state.location["lat"]:.4f}, {st.session_state.location["lon"]:.4f}</div>', unsafe_allow_html=True)
-    elif st.session_state.location["status"] == "error":
-        st.error(f"⚠️ Error de GPS: {st.session_state.location['message']}. ¡Revisa permisos y recarga!")
-    elif st.session_state.location["status"] == "pending":
-        st.warning("🛰️ Obteniendo ubicación GPS... Por favor, acepta el permiso.")
+    # --- LÓGICA DEL BOTÓN DE SOLICITUD GPS ---
+    gps_status = st.session_state.location["status"]
+    gps_status_placeholder = st.empty()
+
+    if not st.session_state.location_permission_requested:
+        # Mostrar botón de solicitud de permiso antes de cualquier otra cosa
+        if st.button("🔴 SOLICITAR PERMISO GPS", key="request_gps", use_container_width=True):
+            st.session_state.location_permission_requested = True
+            st.rerun() # Forzar re-run para activar el componente JS
+    else:
+        # Si ya se solicitó, mostrar el estado
+        if gps_status == "success":
+            gps_status_placeholder.markdown(f'<div class="safe-zone" style="text-align: center; background: #005f5f;">🛰️ GPS FIJADO: {st.session_state.location["lat"]:.4f}, {st.session_state.location["lon"]:.4f}</div>', unsafe_allow_html=True)
+        elif gps_status == "error":
+            gps_status_placeholder.error(f"⚠️ Error de GPS: {st.session_state.location['message']}. ¡Revisa permisos o recarga!")
+        elif gps_status == "pending":
+            gps_status_placeholder.warning("🛰️ Buscando ubicación GPS... Por favor, si el navegador te lo pide, da el permiso.")
+
 
     # Zona de riesgo (simulada)
     zona_riesgo = check_risk_zone(-12.065, -75.210)
@@ -375,16 +413,12 @@ with tabs[0]:
     # Placeholder para el contador y los botones de envío
     placeholder = st.empty()
 
-    # --- ¡MEJORA DE LÓGICA! ---
     # Comprobar si el GPS está listo ANTES de dibujar el botón
-    gps_ready = st.session_state.location["status"] == "success"
+    gps_ready = gps_status == "success" and st.session_state.location_permission_requested
 
     # Botón de pánico GIGANTE
-    # --- ¡MEJORA! El botón se deshabilita si el GPS no está listo ---
     if placeholder.button("🚨 PÁNICO 🚨", key="panic_main", type="primary", disabled=not gps_ready):
         
-        # Esta lógica SÓLO se ejecuta si gps_ready era True y el usuario hizo clic
-            
         # --- CONSTRUIR LISTA DE CONTACTOS ---
         contacts = [
             st.session_state.contact_1,
@@ -398,9 +432,9 @@ with tabs[0]:
         if not contacts:
             placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
         else:
-            # --- INICIO: LÓGICA DE 3 SEGUNDOS (CORREGIDA CON TRY...EXCEPT) ---
+            # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
             try:
-                with placeholder.container(): # Contenedor para la cuenta regresiva
+                with placeholder.container(): 
                     st.warning("Preparando alerta... 3 segundos")
                     time.sleep(1)
                     st.warning("Preparando alerta... 2 segundos")
@@ -414,7 +448,7 @@ with tabs[0]:
                 user_name = st.session_state.user_name
                 medical_info = st.session_state.medical_info
                 
-                # --- ¡LÓGICA DE ENVÍO MEJORADA! ---
+                # --- LÓGICA DE ENVÍO MEJORADA! ---
                 with placeholder.container():
                     st.success("¡ALERTA LISTA! PRESIONA PARA ENVIAR:")
                     
@@ -439,10 +473,11 @@ with tabs[0]:
                 placeholder.error(f"Error al preparar envío: {e}")
             # --- FIN: LÓGICA DE 3 SEGUNDOS ---
 
-    # --- ¡NUEVO! ---
     # Si el GPS no está listo, mostrar un error claro
-    if not gps_ready:
+    if not gps_ready and st.session_state.location_permission_requested:
         st.warning("El botón de pánico está desactivado. Esperando GPS FIJADO (verde) para activarse.")
+    elif not st.session_state.location_permission_requested:
+         st.info("Presiona el botón 'SOLICITAR PERMISO GPS' arriba para comenzar a buscar tu ubicación.")
 
     # Estadísticas (HUD)
     col1, col2, col3 = st.columns(3)
@@ -467,7 +502,7 @@ with tabs[1]:
     
     m = folium.Map(location=map_center, zoom_start=zoom, tiles="CartoDB dark_matter")
     
-    # Marcador del Usuario (¡NUEVO!)
+    # Marcador del Usuario
     if st.session_state.location["status"] == "success":
         folium.Marker(
             [st.session_state.location['lat'], st.session_state.location['lon']],
@@ -487,7 +522,6 @@ with tabs[1]:
         for lat, lon, nombre, horario in safe_locations:
             folium.Marker([lat, lon], popup=f"🏪 {nombre} ({horario})", icon=folium.Icon(color="green", icon="shield", prefix='fa')).add_to(m)
     
-    # Ajustar tamaño del mapa al contenedor
     st_folium(m, width=360, height=400)
 
 # ---------------- PESTAÑA REPORTAR ----------------
@@ -524,6 +558,7 @@ with tabs[4]:
         nombre = st.text_input("Tu Nombre", st.session_state.user_name) 
         
         st.subheader("Contactos de Emergencia")
+        st.caption("Añade el número con el código de país (Ej: +51999888777).")
         contact_1 = st.text_input("Contacto 1 (Principal)", st.session_state.contact_1)
         contact_2 = st.text_input("Contacto 2 (Opcional)", st.session_state.contact_2)
         contact_authority = st.text_input("Autoridad (Policía, Bomberos, etc. Opcional)", st.session_state.contact_authority)

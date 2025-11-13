@@ -4,7 +4,6 @@ from streamlit_folium import st_folium
 from folium.plugins import HeatMap
 import webbrowser
 import streamlit.components.v1 as components
-import time # ¡Importante para el contador de 3 segundos!
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -201,8 +200,6 @@ if 'emergency_number' not in st.session_state:
     st.session_state.emergency_number = "+51999888777" # Número de emergencia
 if 'location' not in st.session_state:
     st.session_state.location = None # Aquí guardaremos el GPS
-if 'user_name' not in st.session_state:
-    st.session_state.user_name = "Usuario Anónimo" # ¡NUEVO! Guardar el nombre del usuario
 
 # --- 5. COMPONENTE HTML/JS PARA OBTENER UBICACIÓN ---
 # Este componente usa JS para pedir la ubicación al navegador
@@ -231,20 +228,17 @@ def check_risk_zone(lat, lon):
     # Lógica de simulación (sin cambios)
     return {'nombre': 'Av. Ferrocarril', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
-def trigger_whatsapp(number, lat, lon, user_name):
-    # MENSAJE DE ALERTA MEJORADO Y PERSONALIZADO
-    # Convertir nombre a mayúsculas para más urgencia
-    user_name_upper = user_name.upper()
-    
+def trigger_whatsapp(number, lat, lon):
+    # MENSAJE DE ALERTA MEJORADO ("Que encienda el mundo")
     message = (
-        f"🚨 *¡¡¡EMERGENCIA CRÍTICA!!! ¡{user_name_upper} ESTÁ EN PELIGRO Y NECESITA AYUDA AHORA!* 🚨\n\n"
-        f"¡ESTA ES UNA ALERTA DE PÁNICO REAL! ¡{user_name_upper} HA PRESIONADO EL BOTÓN DE EMERGENCIA!\n"
-        "¡POR FAVOR, ACUDE O ENVÍA AYUDA DE INMEDIATO!\n\n"
-        "📍 *UBICACIÓN GPS EXACTA:*\n"
+        "🚨 *¡¡¡EMERGENCIA CRÍTICA!!! ¡NECESITO AYUDA AHORA!* 🚨\n\n"
+        "¡ESTO ES UNA ALERTA DE PÁNICO REAL! MI SEGURIDAD ESTÁ EN RIESGO INMINENTE.\n"
+        "¡POR FAVOR, ENVÍEN AYUDA DE INMEDIATO!\n\n"
+        "📍 *MI UBICACIÓN GPS EXACTA ES:*\n"
         f"https://maps.google.com/?q={lat},{lon}\n\n"
         f"Latitud: {lat}\n"
         f"Longitud: {lon}\n\n"
-        "¡¡¡ACTÚA RÁPIDO, ES UNA EMERGENCIA!!! "
+        "¡¡¡ACTÚEN RÁPIDO, ES UNA EMERGENCIA!!! "
         "¡¡¡NO ES SIMULACRO!!!"
     )
     # URL Encode (aunque webbrowser suele manejarlo, es buena práctica)
@@ -298,40 +292,16 @@ with tabs[0]:
     zona_riesgo = check_risk_zone(-12.065, -75.210)
     st.markdown(f'<div class="warning-alert">¡ALERTA! ZONA DE RIESGO: {zona_riesgo["nombre"]}</div>', unsafe_allow_html=True)
     
-    # Placeholder para el contador de 3 segundos
-    countdown_placeholder = st.empty()
-
     # Botón de pánico GIGANTE
     # Usamos st.button con kind="primary" para que nuestro CSS lo detecte
     if st.button("🚨 PÁNICO 🚨", key="panic_main", type="primary"):
         if st.session_state.location:
-            
-            # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
-            try:
-                # Mostrar cuenta regresiva en el placeholder
-                countdown_placeholder.warning("Preparando alerta... 3 segundos")
-                time.sleep(1)
-                countdown_placeholder.warning("Preparando alerta... 2 segundos")
-                time.sleep(1)
-                countdown_placeholder.warning("Preparando alerta... 1 segundo")
-                time.sleep(1)
-                
-                # --- ENVIAR ALERTA ---
-                lat = st.session_state.location['lat']
-                lon = st.session_state.location['lon']
-                user_name = st.session_state.user_name # ¡Obtenemos el nombre del perfil!
-                
-                # ¡Enviamos el nombre a la función de WhatsApp!
-                trigger_whatsapp(st.session_state.emergency_number, lat, lon, user_name)
-                
-                st.session_state.panic_active = True
-                countdown_placeholder.success("¡Alerta de pánico enviada a WhatsApp!")
-                st.balloons()
-
-            except Exception as e:
-                countdown_placeholder.error(f"Error al enviar: {e}")
-            # --- FIN: LÓGICA DE 3 SEGUNDOS ---
-
+            lat = st.session_state.location['lat']
+            lon = st.session_state.location['lon']
+            trigger_whatsapp(st.session_state.emergency_number, lat, lon)
+            st.session_state.panic_active = True
+            st.success("¡Alerta de pánico enviada a WhatsApp!")
+            st.balloons()
         else:
             st.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS.")
 
@@ -409,16 +379,11 @@ with tabs[3]:
 # ---------------- PESTAÑA PERFIL ----------------
 with tabs[4]:
     st.title("👤 PERFIL DE USUARIO")
-    st.info("Tu nombre se incluirá en las alertas de pánico.")
-    
     with st.form("profile_form"):
-        # ¡CAMPO DE NOMBRE AÑADIDO!
-        nombre = st.text_input("Tu Nombre", st.session_state.user_name) 
+        nombre = st.text_input("Tu Nombre", "Usuario Anónimo")
         emergencia_num = st.text_input("Contacto de Emergencia (WhatsApp)", st.session_state.emergency_number)
         
         if st.form_submit_button("💾 GUARDAR PERFIL"):
-            # ¡GUARDAR AMBOS CAMPOS!
-            st.session_state.user_name = nombre
             st.session_state.emergency_number = emergencia_num
             st.success("Perfil actualizado correctamente")
 

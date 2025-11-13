@@ -254,10 +254,19 @@ def trigger_whatsapp(number, lat, lon):
 # Lo ejecutamos ANTES de las pestañas para tener la info lista
 if st.session_state.location is None:
     location_data = components.html(GET_LOCATION_HTML, height=0)
-    if location_data:
+
+    # --- LA CORRECCIÓN ESTÁ AQUÍ ---
+    # Verificamos que location_data sea un DICIONARIO (dict) antes de asignarlo.
+    # El error anterior era que location_data podia ser un 'DeltaGenerator'
+    # y el 'if location_data:' se evaluaba como True, guardando el objeto incorrecto.
+    if isinstance(location_data, dict):
         st.session_state.location = location_data
         # Forzamos un re-run para que la app se actualice con la nueva ubicación
         st.rerun()
+    elif location_data is None:
+        # El componente devolvió 'null' (probablemente error de permisos o el usuario denegó)
+        # No hacemos nada, la app mostrará el st.warning() en la pestaña Inicio
+        pass
 
 # --- 8. PESTAÑAS (TABS) ---
 tabs = st.tabs([

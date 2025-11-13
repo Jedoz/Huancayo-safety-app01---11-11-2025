@@ -131,6 +131,24 @@ st.markdown("""
     .stButton > button[key="request_gps"]:hover {
         background-color: #c00;
     }
+    
+    /* --- BOTÓN DE REINTENTO GPS (AZUL CYAN) --- */
+    .stButton > button[key="retry_gps"] {
+        background-color: #00f0ff; 
+        color: #0a0a0f; /* Texto negro */
+        border: 2px solid #00f0ff;
+        border-radius: 8px;
+        font-family: 'Share Tech Mono', monospace;
+        font-weight: bold;
+        width: 100%;
+        padding: 15px;
+        box-shadow: 0 0 10px #00f0ff;
+        transition: background-color 0.2s;
+        margin-bottom: 20px;
+    }
+    .stButton > button[key="retry_gps"]:hover {
+        background-color: #33ffff;
+    }
 
 
     /* --- Tarjetas de Métricas (HUD) --- */
@@ -211,7 +229,7 @@ st.markdown("""
     }
     
     /* Botones normales y de envío (no-pánico) */
-    .stButton > button:not([kind="primary"]) {
+    .stButton > button:not([kind="primary"]):not([key="retry_gps"]):not([key="request_gps"]) {
         background: #00f0ff;
         color: #0a0a0f;
         font-family: 'Share Tech Mono', monospace;
@@ -258,11 +276,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ESTADO DE SESIÓN (NUEVO ESTADO INICIAL) ---
+# --- 4. ESTADO DE SESIÓN ---
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
 if 'contact_1' not in st.session_state:
-    st.session_state.contact_1 = "+51999999999" # Ejemplo
+    st.session_state.contact_1 = "+51999999999" # Ejemplo para iniciar con un número
 if 'contact_2' not in st.session_state:
     st.session_state.contact_2 = "" 
 if 'contact_authority' not in st.session_state:
@@ -274,8 +292,7 @@ if 'user_name' not in st.session_state:
 
 # LÓGICA DE UBICACIÓN MEJORADA
 if 'location' not in st.session_state:
-    # NUEVO ESTADO INICIAL: 'not_requested'
-    st.session_state.location = {"status": "not_requested"} 
+    st.session_state.location = {"status": "not_requested"} # Estados: not_requested, pending, success, error
 if 'location_permission_requested' not in st.session_state:
     st.session_state.location_permission_requested = False
 
@@ -288,18 +305,14 @@ GET_LOCATION_HTML_V2 = """
         maximumAge: 0
     };
 
-    // Pedir permiso de geolocalización
-    // Este código se ejecuta cuando el componente se carga.
-    // Como ahora se carga después del clic del usuario, debería solicitar el permiso.
+    // Este código se ejecuta cuando el componente se carga, solicitando la ubicación.
     navigator.geolocation.getCurrentPosition(
-        // Éxito: Enviar coordenadas a Streamlit
         (position) => {
             Streamlit.setComponentValue({
                 "lat": position.coords.latitude,
                 "lon": position.coords.longitude
             });
         },
-        // Error: Enviar el mensaje de error
         (error) => {
             let errorMessage = "Permiso denegado o error desconocido.";
             if (error.code === error.PERMISSION_DENIED) {
@@ -344,25 +357,23 @@ def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
     
     message_encoded = urllib.parse.quote(message)
     number_cleaned = number.replace('+', '').replace(' ', '')
-    # El API de wa.me requiere el número sin el '+'
     url = f"https://wa.me/{number_cleaned}?text={message_encoded}" 
     return url
 
 # --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN (LÓGICA ACTUALIZADA) ---
-# Ejecutamos el HTML/JS solo si el permiso ha sido solicitado Y no tenemos éxito todavía
+# Ejecutamos el componente HTML/JS solo si el permiso ha sido solicitado 
+# y el estado no es 'success' (ya sea 'pending' o 'error')
 if st.session_state.location_permission_requested and st.session_state.location["status"] != "success":
     
-    # Si el estado actual es 'not_requested', lo cambiamos a 'pending' antes de ejecutar el JS
+    # Si el estado actual es 'not_requested' (primera vez), lo cambiamos a 'pending'
     if st.session_state.location["status"] == "not_requested":
         st.session_state.location["status"] = "pending"
-        # No hacemos rerun aquí para evitar un loop innecesario. El componente se cargará.
     
     # Creamos el componente HTML para ejecutar el JavaScript de geolocalización
     location_data = components.html(GET_LOCATION_HTML_V2, height=0)
 
     # Verificamos la respuesta del componente
     if isinstance(location_data, dict):
-        # SOLO si recibimos datos, procesamos y forzamos un re-run
         if "lat" in location_data:
             # --- ¡ÉXITO! ---
             st.session_state.location = {
@@ -370,7 +381,8 @@ if st.session_state.location_permission_requested and st.session_state.location[
                 "lat": location_data["lat"],
                 "lon": location_data["lon"]
             }
-            st.rerun()
+            # Forzamos un re-run para actualizar la UI con la ubicación fijada
+            st.rerun() 
 
         elif "error" in location_data:
             # --- ¡ERROR! ---
@@ -378,6 +390,7 @@ if st.session_state.location_permission_requested and st.session_state.location[
                 "status": "error",
                 "message": location_data["error"]
             }
+            # Forzamos un re-run para mostrar el error y el botón de reintento
             st.rerun()
 
 # --- 8. PESTAÑAS (TABS) ---
@@ -387,23 +400,34 @@ tabs = st.tabs(["🏠", "🗺️", "📢", "🏪", "👤", "🧠"])
 with tabs[0]:
     st.title("🛡️ SECURE MAP HUANCAYO")
     
-    # --- LÓGICA DEL BOTÓN DE SOLICITUD GPS ---
+    # --- LÓGICA DEL BOTÓN DE SOLICITUD GPS Y REINTENTO ---
     gps_status = st.session_state.location["status"]
     gps_status_placeholder = st.empty()
 
-    if not st.session_state.location_permission_requested:
-        # Mostrar botón de solicitud de permiso antes de cualquier otra cosa
+    if gps_status == "not_requested":
+        # PANTALLA INICIAL: Mostrar botón de solicitud de permiso
         if st.button("🔴 SOLICITAR PERMISO GPS", key="request_gps", use_container_width=True):
             st.session_state.location_permission_requested = True
             st.rerun() # Forzar re-run para activar el componente JS
     else:
-        # Si ya se solicitó, mostrar el estado
+        # PANTALLA POST-SOLICITUD: Mostrar estado o reintento
         if gps_status == "success":
             gps_status_placeholder.markdown(f'<div class="safe-zone" style="text-align: center; background: #005f5f;">🛰️ GPS FIJADO: {st.session_state.location["lat"]:.4f}, {st.session_state.location["lon"]:.4f}</div>', unsafe_allow_html=True)
+        
         elif gps_status == "error":
-            gps_status_placeholder.error(f"⚠️ Error de GPS: {st.session_state.location['message']}. ¡Revisa permisos o recarga!")
+            gps_status_placeholder.error(f"⚠️ Error de GPS: {st.session_state.location['message']}.")
+            # ¡NUEVO! Botón de reintento después de un error o denegación
+            if st.button("🔄 REINTENTAR GPS", key="retry_gps", use_container_width=True):
+                st.session_state.location["status"] = "pending" # Forzar el estado a pending
+                st.rerun()
+            st.info("Asegúrate de haber presionado 'Allow' en el navegador y luego presiona REINTENTAR.")
+
         elif gps_status == "pending":
-            gps_status_placeholder.warning("🛰️ Buscando ubicación GPS... Por favor, si el navegador te lo pide, da el permiso.")
+            gps_status_placeholder.warning("🛰️ Buscando ubicación GPS... (Espera 5 segundos o presiona Reintentar).")
+            # ¡NUEVO! Botón de reintento mientras está buscando
+            if st.button("🔄 REINTENTAR GPS", key="retry_gps", use_container_width=True):
+                st.session_state.location["status"] = "pending" # Esto fuerza la ejecución del JS de nuevo
+                st.rerun()
 
 
     # Zona de riesgo (simulada)
@@ -414,7 +438,7 @@ with tabs[0]:
     placeholder = st.empty()
 
     # Comprobar si el GPS está listo ANTES de dibujar el botón
-    gps_ready = gps_status == "success" and st.session_state.location_permission_requested
+    gps_ready = gps_status == "success"
 
     # Botón de pánico GIGANTE
     if placeholder.button("🚨 PÁNICO 🚨", key="panic_main", type="primary", disabled=not gps_ready):
@@ -425,7 +449,6 @@ with tabs[0]:
             st.session_state.contact_2,
             st.session_state.contact_authority
         ]
-        # Filtrar vacíos
         contacts = [c for c in contacts if c and len(c) > 5]
 
         # --- VERIFICAR SI HAY CONTACTOS ---
@@ -474,10 +497,10 @@ with tabs[0]:
             # --- FIN: LÓGICA DE 3 SEGUNDOS ---
 
     # Si el GPS no está listo, mostrar un error claro
-    if not gps_ready and st.session_state.location_permission_requested:
+    if not gps_ready and gps_status != "not_requested":
         st.warning("El botón de pánico está desactivado. Esperando GPS FIJADO (verde) para activarse.")
-    elif not st.session_state.location_permission_requested:
-         st.info("Presiona el botón 'SOLICITAR PERMISO GPS' arriba para comenzar a buscar tu ubicación.")
+    elif gps_status == "not_requested":
+         st.info("Presiona el botón 'SOLICITAR PERMISO GPS' arriba para comenzar.")
 
     # Estadísticas (HUD)
     col1, col2, col3 = st.columns(3)

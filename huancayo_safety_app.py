@@ -5,6 +5,7 @@ from folium.plugins import HeatMap
 import streamlit.components.v1 as components
 import time 
 import urllib.parse 
+from datetime import datetime
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -13,6 +14,11 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# --- COORDENADAS DE LA UTP HUANCAYO (SIMULACIÓN) ---
+# Aproximado: Av. Circunvalación 449, El Tambo
+UTP_LAT = -12.0658
+UTP_LON = -75.2075
 
 # --- 2. DATOS SIMULADOS (Sin cambios) ---
 danger_points = [
@@ -158,6 +164,18 @@ st.markdown("""
         border: 1px solid #00f0ff;
         box-shadow: 0 0 10px #00f0ff;
     }
+    
+    /* --- Registro de Alerta (Log) --- */
+    .alert-log {
+        background: #0d1b2a;
+        padding: 10px;
+        border-radius: 8px;
+        color: #00f0ff;
+        font-size: 14px;
+        text-align: center;
+        border: 1px dashed #00f0ff;
+        margin-bottom: 15px;
+    }
 
     /* --- Estilo de Pestañas (Tabs) MEJORADO (SOLO ICONOS) --- */
     [data-baseweb="tab-list"] {
@@ -239,7 +257,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ESTADO DE SESIÓN (MODIFICADO PARA SIMULACIÓN) ---
+# --- 4. ESTADO DE SESIÓN (MODIFICADO PARA REGISTRO DE ALERTA) ---
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
 if 'contact_1' not in st.session_state:
@@ -247,50 +265,55 @@ if 'contact_1' not in st.session_state:
 if 'contact_2' not in st.session_state:
     st.session_state.contact_2 = "+51999888777" 
 if 'contact_authority' not in st.session_state:
-    st.session_state.contact_authority = "51987654321" # Sin el + para probar la limpieza
+    st.session_state.contact_authority = "+51987654321" # Se añade el +
 if 'medical_info' not in st.session_state:
     st.session_state.medical_info = "Tipo de sangre: O+, Alergias: Penicilina." 
 if 'user_name' not in st.session_state:
     st.session_state.user_name = "Andrea G."
+if 'last_alert_time' not in st.session_state:
+    st.session_state.last_alert_time = None # Nuevo campo
 
 # LÓGICA DE UBICACIÓN AHORA ES FIJA Y EXITOSA (MODO SIMULACIÓN)
 st.session_state.location = {
     "status": "success",  # SIMULACIÓN: Siempre exitoso
-    "lat": -12.065,       # Latitud de Huancayo (Simulada)
-    "lon": -75.210        # Longitud de Huancayo (Simulada)
+    "lat": UTP_LAT,       # Latitud de UTP Huancayo
+    "lon": UTP_LON        # Longitud de UTP Huancayo
 }
-# La variable location_permission_requested ya no es necesaria
 
 # --- 5. ELIMINACIÓN DE COMPONENTE HTML/JS (Para evitar conflictos) ---
 # El código para obtener la ubicación real ha sido eliminado para la simulación.
 
-# --- 6. FUNCIONES MEJORADAS (Sin cambios) ---
+# --- 6. FUNCIONES MEJORADAS (Menaje de Alerta Estilo Militar) ---
 def check_risk_zone(lat, lon):
     # Función de simulación de riesgo
-    return {'nombre': 'Av. Ferrocarril', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
+    return {'nombre': 'Av. Circunvalación UTP', 'incidentes': 3, 'nivel': 'Alto', 'horario': 'última hora'}
 
 def generate_whatsapp_url(number, lat, lon, user_name, medical_info):
+    """Genera la URL de WhatsApp con un mensaje de emergencia estilo militar."""
     if not number or len(number) < 5:
         return None 
         
     user_name_upper = user_name.upper()
     
+    # --- MENSAJE DE ALERTA ESTILO MILITAR/URGENTE ---
     message = (
-        f"🚨 *¡¡¡EMERGENCIA CRÍTICA!!! ¡{user_name_upper} ESTÁ EN PELIGRO Y NECESITA AYUDA AHORA!* 🚨\n\n"
-        f"¡ESTA ES UNA ALERTA DE PÁNICO REAL! ¡{user_name_upper} HA PRESIONADO EL BOTÓN DE EMERGENCIA!\n"
-        "¡POR FAVOR, ACUDE O ENVÍA AYUDA DE INMEDIATO!\n\n"
-        "📍 *UBICACIÓN GPS EXACTA (SIMULADA):*\n"
-        f"https://maps.google.com/?q={lat},{lon}\n"
-        f"Latitud: {lat}\n"
-        f"Longitud: {lon}\n\n"
-        "🩺 *INFORMACIÓN MÉDICA RELEVANTE:*\n"
-        f"{medical_info}\n\n"
-        "¡¡¡ACTÚA RÁPIDO, ES UNA EMERGENCIA!!! "
-        "¡¡¡NO ES SIMULACRO!!!"
+        f"🔴 *ALARMA | CÓDIGO ROJO - ACTIVACIÓN PÁNICO ({user_name_upper})* 🔴\n\n"
+        f"COMANDO: REQUERIMIENTO DE APOYO INMEDIATO. SITUACIÓN DE RIESGO CONFIRMADA.\n"
+        f"USUARIO: {user_name_upper}.\n\n"
+        
+        "✅ *COORDENADAS DE EMERGENCIA (SIMULADAS):*\n"
+        f"MAPA TÁCTICO: https://maps.google.com/?q={lat},{lon}\n"
+        f"L/L (Latitud/Longitud): {lat}, {lon}\n\n"
+        
+        "⚕️ *INFO MÉDICA VITAL:*\n"
+        f"DETALLES: {medical_info}\n\n"
+        
+        "*PRIORIDAD MÁXIMA. PROCEDER A LA ZONA. REPITO: NO ES SIMULACRO.*"
     )
     
     message_encoded = urllib.parse.quote(message)
     number_cleaned = number.replace('+', '').replace(' ', '')
+    # Se usa 'wa.me/' que es el estándar para iniciar chats, no la API de envío directo
     url = f"https://wa.me/{number_cleaned}?text={message_encoded}" 
     return url
 
@@ -309,8 +332,16 @@ with tabs[0]:
     lon_sim = st.session_state.location["lon"]
 
     # Mostrar que el GPS está fijado y en modo simulación
-    st.markdown(f'<div class="safe-zone" style="text-align: center; background: #50c878;">✅ GPS SIMULADO: {lat_sim:.4f}, {lon_sim:.4f}</div>', unsafe_allow_html=True)
-    st.info("⚠️ ESTE MODO USA UNA UBICACIÓN FIJA (-12.065, -75.210) para pruebas. El botón PÁNICO está activo.")
+    st.markdown(f'<div class="safe-zone" style="text-align: center; background: #50c878;">✅ GPS SIMULADO UTP: {lat_sim:.4f}, {lon_sim:.4f}</div>', unsafe_allow_html=True)
+    st.info("⚠️ ESTE MODO USA UNA UBICACIÓN FIJA (UTP) para pruebas. El botón PÁNICO está activo.")
+    
+    # MOSTRAR ÚLTIMA ALERTA REGISTRADA (NUEVO)
+    if st.session_state.last_alert_time:
+        alert_dt = datetime.fromtimestamp(st.session_state.last_alert_time)
+        alert_str = alert_dt.strftime("%d/%m/%Y %H:%M:%S")
+        st.markdown(f'<div class="alert-log">ÚLTIMA ALERTA REGISTRADA: ⏰ {alert_str}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="alert-log">No hay alertas registradas.</div>', unsafe_allow_html=True)
 
 
     # Zona de riesgo (simulada)
@@ -324,28 +355,36 @@ with tabs[0]:
     gps_ready = True # Siempre True en modo simulación
 
     # Botón de pánico GIGANTE
+    # Note: st.button solo puede tener un key="panic_main" para ser único.
     if placeholder.button("🚨 PÁNICO 🚨", key="panic_main", type="primary", disabled=not gps_ready):
         
-        # --- CONSTRUIR LISTA DE CONTACTOS ---
-        contacts = [
-            st.session_state.contact_1,
-            st.session_state.contact_2,
-            st.session_state.contact_authority
-        ]
-        contacts = [c for c in contacts if c and len(c) > 5]
+        # --- CONSTRUIR LISTA DE CONTACTOS VÁLIDOS ---
+        # Se asegura que solo se incluyan números con más de 5 dígitos (mínimo, para evitar campos vacíos)
+        contacts_to_alert = []
+        if st.session_state.contact_1 and len(st.session_state.contact_1) > 5:
+            contacts_to_alert.append(st.session_state.contact_1)
+        if st.session_state.contact_2 and len(st.session_state.contact_2) > 5:
+            contacts_to_alert.append(st.session_state.contact_2)
+        if st.session_state.contact_authority and len(st.session_state.contact_authority) > 5:
+            contacts_to_alert.append(st.session_state.contact_authority)
 
         # --- VERIFICAR SI HAY CONTACTOS ---
-        if not contacts:
+        if not contacts_to_alert:
+            # Re-dibujar el botón de pánico desactivado para que el error sea visible
+            st.button("🚨 PÁNICO 🚨", key="panic_main_disabled", type="primary", disabled=True)
             placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
         else:
             # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
             try:
+                # REGISTRAR LA HORA DEL EVENTO INMEDIATAMENTE
+                st.session_state.last_alert_time = time.time()
+                
                 with placeholder.container(): 
-                    st.warning("Preparando alerta... 3 segundos")
+                    st.warning("Activación de Protocolo de Alerta... 3 segundos")
                     time.sleep(1)
-                    st.warning("Preparando alerta... 2 segundos")
+                    st.warning("Activación de Protocolo de Alerta... 2 segundos")
                     time.sleep(1)
-                    st.warning("Preparando alerta... 1 segundo")
+                    st.warning("Activación de Protocolo de Alerta... 1 segundo")
                     time.sleep(1)
                 
                 # --- OBTENER DATOS PARA MENSAJES ---
@@ -354,25 +393,27 @@ with tabs[0]:
                 user_name = st.session_state.user_name
                 medical_info = st.session_state.medical_info
                 
-                # --- LÓGICA DE ENVÍO MEJORADA! ---
+                # --- LÓGICA DE ENVÍO MEJORADA (Usando los contactos de la lista) ---
                 with placeholder.container():
-                    st.success("¡ALERTA LISTA! PRESIONA PARA ENVIAR (SE ABRIRÁ WHATSAPP):")
+                    st.success("¡ALERTA TÁCTICA LISTA! PRESIONA PARA ABRIR EN WHATSAPP:")
                     
                     # Generar URL para Contacto 1
                     url_1 = generate_whatsapp_url(st.session_state.contact_1, lat, lon, user_name, medical_info)
-                    if url_1:
+                    if url_1 and st.session_state.contact_1 in contacts_to_alert:
                         # Usamos link_button para que se abra en una nueva pestaña
-                        st.link_button(f"ENVIAR A CONTACTO 1 (Principal)", url_1, use_container_width=True, type="primary")
+                        st.link_button(f"🔴 ENVIAR A CONTACTO 1 (PRINCIPAL)", url_1, use_container_width=True, type="primary")
+                        contacts_to_alert.remove(st.session_state.contact_1) # Lo removemos para no repetir
 
                     # Generar URL para Contacto 2
                     url_2 = generate_whatsapp_url(st.session_state.contact_2, lat, lon, user_name, medical_info)
-                    if url_2:
-                        st.link_button(f"ENVIAR A CONTACTO 2 (Secundario)", url_2, use_container_width=True, type="secondary")
+                    if url_2 and st.session_state.contact_2 in contacts_to_alert:
+                        st.link_button(f"🟡 ENVIAR A CONTACTO 2 (SECUNDARIO)", url_2, use_container_width=True, type="secondary")
+                        contacts_to_alert.remove(st.session_state.contact_2) # Lo removemos
 
                     # Generar URL para Autoridad
                     url_3 = generate_whatsapp_url(st.session_state.contact_authority, lat, lon, user_name, medical_info)
-                    if url_3:
-                        st.link_button(f"ENVIAR A AUTORIDAD", url_3, use_container_width=True, type="secondary")
+                    if url_3 and st.session_state.contact_authority in contacts_to_alert:
+                        st.link_button(f"🚔 ENVIAR A AUTORIDAD/EMERGENCIA", url_3, use_container_width=True, type="secondary")
                 
                 st.balloons()
 
@@ -390,7 +431,7 @@ with tabs[0]:
 with tabs[1]:
     st.title("🗺️ MAPA DE SEGURIDAD")
     
-    # Centrar el mapa en la ubicación del usuario simulada
+    # Centrar el mapa en la ubicación del usuario simulada (UTP)
     map_center = [st.session_state.location['lat'], st.session_state.location['lon']]
     zoom = 16
 
@@ -399,10 +440,10 @@ with tabs[1]:
     
     m = folium.Map(location=map_center, zoom_start=zoom, tiles="CartoDB dark_matter")
     
-    # Marcador del Usuario (Simulado)
+    # Marcador del Usuario (Simulado en UTP)
     folium.Marker(
         [st.session_state.location['lat'], st.session_state.location['lon']],
-        popup="¡TÚ ESTÁS AQUÍ! (SIMULADO)",
+        popup="¡TÚ ESTÁS AQUÍ! (UTP SIMULADA)",
         icon=folium.Icon(color="blue", icon="person", prefix='fa')
     ).add_to(m)
 
@@ -426,8 +467,8 @@ with tabs[2]:
     with st.form("report_form"):
         tipo_incidente = st.selectbox("Tipo de Incidente", ["Robo","Acoso","Persona Sospechosa","Asalto","Accidente","Otro"])
         
-        # Usar ubicación GPS simulada
-        ubicacion_default = f"GPS SIMULADO: {st.session_state.location['lat']:.5f}, {st.session_state.location['lon']:.5f}"
+        # Usar ubicación GPS simulada UTP
+        ubicacion_default = f"GPS SIMULADO UTP: {st.session_state.location['lat']:.5f}, {st.session_state.location['lon']:.5f}"
         
         ubicacion = st.text_input("Ubicación aproximada", ubicacion_default)
         descripcion = st.text_area("Descripción del incidente", "Describa lo que sucedió...")
@@ -446,7 +487,7 @@ with tabs[3]:
 # ---------------- PESTAÑA PERFIL ----------------
 with tabs[4]:
     st.title("👤 PERFIL DE USUARIO")
-    st.info("Tu nombre e info médica se incluirán en las alertas de pánico.")
+    st.info("Tu nombre e info médica se incluirán en las alertas de pánico. Usa el código de país (Ej: +51).")
     
     with st.form("profile_form"):
         nombre = st.text_input("Tu Nombre", st.session_state.user_name) 

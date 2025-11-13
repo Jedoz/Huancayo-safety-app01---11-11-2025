@@ -51,112 +51,16 @@ st.markdown("""
         }
     }
 
-    /* Estilo base de la App (Simulación Móvil) */
-    .stApp {
-        background-color: #0a0a0f; /* Negro Cyberpunk */
-        color: #ffffff;
-        font-family: 'Share Tech Mono', monospace;
-        max-width: 390px; /* Ancho de iPhone Pro */
-        min-height: 844px; /* Altura mínima */
-        margin: 10px auto;
-        padding: 0 !important; /* Sin padding exterior */
-        border: 1px solid #333;
-        border-radius: 20px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        overflow: hidden; /* Para mantener los bordes redondeados */
-    }
-    
-    /* Ocultar footer de Streamlit */
-    footer {
-        visibility: hidden;
-    }
-    
-    /* Contenedor principal de Streamlit */
-    div[data-testid="stAppViewContainer"] {
-        padding: 0 1rem 1rem 1rem !important;
-    }
-
-    /* --- BOTÓN DE PÁNICO GIGANTE Y PULSANTE --- */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(145deg, #ff2d95, #e6007e);
-        color: #ffffff;
-        border-radius: 50%;
-        width: 280px; /* Mucho más grande */
-        height: 280px; /* Mucho más grande */
-        font-size: 48px; /* Texto más grande */
-        font-weight: bold;
-        font-family: 'Share Tech Mono', monospace;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 25px auto;
-        border: 4px solid #ffffff;
-        text-shadow: 0 0 10px #ffffff;
-        
-        /* Animación de Pulso */
-        animation: pulse 1.5s infinite ease-in-out;
-        transition: transform 0.2s;
-    }
-    .stButton > button[kind="primary"]:hover {
-        transform: scale(1.1) !important;
-        background: linear-gradient(145deg, #ff55aa, #ff2d95);
-    }
-    .stButton > button[kind="primary"]:active {
-        transform: scale(1.05) !important;
-    }
-
-    /* --- Tarjetas de Métricas (HUD) --- */
-    .metric-card {
-        background: #112d3c;
-        padding: 12px;
-        border-radius: 8px;
-        text-align: center;
-        font-size: 14px;
-        margin: 5px 0;
-        color: #00f0ff; /* Neón Cian */
-        border: 1px solid #00f0ff;
-        box-shadow: 0 0 10px #00f0ff;
-        font-weight: bold;
-    }
-    .metric-card strong {
-        font-size: 20px;
-        color: #ffffff;
-        display: block;
-    }
-
-    /* --- Alerta de Zona (HUD Warning) --- */
-    .warning-alert {
-        background: #ff2d95; /* Neón Magenta */
-        color: #0a0a0f; /* Texto negro para máximo contraste */
-        padding: 14px;
-        border-radius: 8px;
-        margin: 10px 0;
-        font-size: 16px;
-        font-weight: bold;
-        text-align: center;
-        border: 2px solid #ffffff;
-        box-shadow: 0 0 15px #ff2d95;
-    }
-
-    /* --- Zona Segura (HUD Safe) --- */
-    .safe-zone {
-        background: #005f5f; /* Verde/Cian oscuro */
-        padding: 12px;
-        border-radius: 8px;
-        margin: 8px 0;
-        color: #ffffff;
-        font-weight: bold;
-        border: 1px solid #00f0ff;
-        box-shadow: 0 0 10px #00f0ff;
-    }
-
-    /* Estilo de Pestañas (Tabs) */
+    /* --- Estilo de Pestañas (Tabs) MEJORADO --- */
     [data-baseweb="tab-list"] {
         background: #111;
+        justify-content: space-around; /* ¡NUEVO! Distribuye los iconos */
+        width: 100%;
     }
     [data-baseweb="tab"] {
         font-family: 'Share Tech Mono', monospace;
-        font-size: 14px;
+        font-size: 26px; /* ¡NUEVO! Iconos más grandes */
+        padding: 10px 0; /* Más área de click */
         background: #111;
         color: #888;
     }
@@ -208,15 +112,24 @@ if 'medical_info' not in st.session_state:
     st.session_state.medical_info = "Datos médicos no especificados" # Info Médica
 # --- FIN DE CAMBIOS EN SESIÓN ---
 if 'location' not in st.session_state:
-    st.session_state.location = None # Aquí guardaremos el GPS
+    # --- LÓGICA DE UBICACIÓN MEJORADA ---
+    # Ahora usamos un dict para manejar todos los estados
+    st.session_state.location = {"status": "pending"} # Estados: pending, success, error
 if 'user_name' not in st.session_state:
     st.session_state.user_name = "Usuario Anónimo" # ¡NUEVO! Guardar el nombre del usuario
 
-# --- 5. COMPONENTE HTML/JS PARA OBTENER UBICACIÓN ---
+# --- 5. COMPONENTE HTML/JS PARA OBTENER UBICACIÓN (V2) ---
 # Este componente usa JS para pedir la ubicación al navegador
 # y la devuelve a Streamlit usando `Streamlit.setComponentValue`
-GET_LOCATION_HTML = """
+# --- AHORA MÁS ROBUSTO, CON ALTA PRECISIÓN Y MANEJO DE ERRORES ---
+GET_LOCATION_HTML_V2 = """
 <script>
+    const options = {
+        enableHighAccuracy: true, // ¡NUEVO! Pedir alta precisión
+        timeout: 5000,            // ¡NUEVO! Timeout de 5 segundos
+        maximumAge: 0
+    };
+
     // Pedir permiso de geolocalización
     navigator.geolocation.getCurrentPosition(
         // Éxito: Enviar coordenadas a Streamlit
@@ -226,10 +139,13 @@ GET_LOCATION_HTML = """
                 "lon": position.coords.longitude
             });
         },
-        // Error: Enviar null
+        // Error: Enviar el mensaje de error
         (error) => {
-            Streamlit.setComponentValue(null);
-        }
+            Streamlit.setComponentValue({
+                "error": error.message 
+            });
+        },
+        options
     );
 </script>
 """
@@ -272,44 +188,52 @@ def trigger_whatsapp(contacts_to_alert, lat, lon, user_name, medical_info):
     
     return urls_opened
 
-# --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN ---
-# Ejecutamos el HTML/JS. El resultado (coordenadas o null) se guarda en `location_data`
-# Lo ejecutamos ANTES de las pestañas para tener la info lista
-if st.session_state.location is None:
-    location_data = components.html(GET_LOCATION_HTML, height=0)
+# --- 7. EJECUCIÓN DEL COMPONENTE DE UBICACIÓN (LÓGICA MEJORADA) ---
+# Ejecutamos el HTML/JS solo si el estado es 'pending'
+if st.session_state.location["status"] == "pending":
+    location_data = components.html(GET_LOCATION_HTML_V2, height=0)
 
-    # --- LA CORRECCIÓN ESTÁ AQUÍ ---
-    # Verificamos que location_data sea un DICIONARIO (dict) antes de asignarlo.
-    # El error anterior era que location_data podia ser un 'DeltaGenerator'
-    # y el 'if location_data:' se evaluaba como True, guardando el objeto incorrecto.
+    # Verificamos la respuesta del componente
     if isinstance(location_data, dict):
-        st.session_state.location = location_data
-        # Forzamos un re-run para que la app se actualice con la nueva ubicación
+        if "lat" in location_data:
+            # --- ¡ÉXITO! ---
+            st.session_state.location = {
+                "status": "success",
+                "lat": location_data["lat"],
+                "lon": location_data["lon"]
+            }
+        elif "error" in location_data:
+            # --- ¡ERROR! ---
+            st.session_state.location = {
+                "status": "error",
+                "message": location_data["error"]
+            }
+        
+        # Forzamos un re-run para que la app se actualice con el nuevo estado
         st.rerun()
-    elif location_data is None:
-        # El componente devolvió 'null' (probablemente error de permisos o el usuario denegó)
-        # No hacemos nada, la app mostrará el st.warning() en la pestaña Inicio
-        pass
 
 # --- 8. PESTAÑAS (TABS) ---
+# --- ¡CAMBIO! AHORA SOLO ICONOS PARA MEJOR UI MÓVIL ---
 tabs = st.tabs([
-    "🏠 INICIO",
-    "🗺️ MAPA",
-    "📢 REPORTAR",
-    "🏪 ZONAS",
-    "👤 PERFIL",
-    "🧠 ANÁLISIS"
+    "🏠", # INICIO
+    "🗺️", # MAPA
+    "📢", # REPORTAR
+    "🏪", # ZONAS
+    "👤", # PERFIL
+    "🧠"  # ANÁLISIS
 ])
 
 # ---------------- PESTAÑA INICIO ----------------
 with tabs[0]:
     st.title("🛡️ SAFETY HUD: HUANCAYO")
     
-    # Mostrar estado de GPS
-    if st.session_state.location:
+    # --- Mostrar estado de GPS (MEJORADO) ---
+    if st.session_state.location["status"] == "success":
         st.markdown(f'<div class="safe-zone" style="text-align: center; background: #005f5f;">🛰️ GPS FIJADO: {st.session_state.location["lat"]:.4f}, {st.session_state.location["lon"]:.4f}</div>', unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ No se pudo obtener tu ubicación. Activa el GPS y recarga la página para usar el botón de pánico.")
+    elif st.session_state.location["status"] == "error":
+        st.error(f"⚠️ Error de GPS: {st.session_state.location['message']}. ¡Revisa permisos y recarga!")
+    elif st.session_state.location["status"] == "pending":
+        st.warning("🛰️ Obteniendo ubicación GPS... Por favor, acepta el permiso.")
 
     # Zona de riesgo (simulada)
     zona_riesgo = check_risk_zone(-12.065, -75.210)
@@ -321,7 +245,8 @@ with tabs[0]:
     # Botón de pánico GIGANTE
     # Usamos st.button con kind="primary" para que nuestro CSS lo detecte
     if st.button("🚨 PÁNICO 🚨", key="panic_main", type="primary"):
-        if st.session_state.location:
+        # --- Verificación de GPS MEJORADA ---
+        if st.session_state.location["status"] == "success":
             
             # --- CONSTRUIR LISTA DE CONTACTOS ---
             contacts_to_alert = [
@@ -364,7 +289,7 @@ with tabs[0]:
                 # --- FIN: LÓGICA DE 3 SEGUNDOS ---
 
         else:
-            st.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS.")
+            st.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS. Revisa los permisos.")
 
     # Estadísticas (HUD)
     col1, col2, col3 = st.columns(3)
@@ -377,7 +302,7 @@ with tabs[1]:
     st.title("🗺️ MAPA DE SEGURIDAD")
     
     # Centrar el mapa en la ubicación del usuario si está disponible, si no, en Huancayo
-    if st.session_state.location:
+    if st.session_state.location["status"] == "success":
         map_center = [st.session_state.location['lat'], st.session_state.location['lon']]
         zoom = 16
     else:
@@ -390,7 +315,7 @@ with tabs[1]:
     m = folium.Map(location=map_center, zoom_start=zoom, tiles="CartoDB dark_matter")
     
     # Marcador del Usuario (¡NUEVO!)
-    if st.session_state.location:
+    if st.session_state.location["status"] == "success":
         folium.Marker(
             [st.session_state.location['lat'], st.session_state.location['lon']],
             popup="¡TÚ ESTÁS AQUÍ!",
@@ -420,7 +345,7 @@ with tabs[2]:
         
         # Usar ubicación GPS si está disponible
         ubicacion_default = "Cerca de..."
-        if st.session_state.location:
+        if st.session_state.location["status"] == "success":
             ubicacion_default = f"GPS: {st.session_state.location['lat']:.5f}, {st.session_state.location['lon']:.5f}"
         
         ubicacion = st.text_input("Ubicación aproximada", ubicacion_default)

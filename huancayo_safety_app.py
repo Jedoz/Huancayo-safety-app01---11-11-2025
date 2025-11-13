@@ -105,6 +105,16 @@ st.markdown("""
     .stButton > button[kind="primary"]:active {
         transform: scale(1.05) !important;
     }
+    
+    /* --- BOTÓN DE PÁNICO DESACTIVADO --- */
+    .stButton > button[kind="primary"]:disabled {
+        background: #555;
+        color: #999;
+        border-color: #888;
+        box-shadow: none;
+        animation: none; /* Sin pulso cuando está desactivado */
+    }
+
 
     /* --- Tarjetas de Métricas (HUD) --- */
     .metric-card {
@@ -208,6 +218,13 @@ st.markdown("""
         text-align: center;
         font-size: 16px;
     }
+    /* Botón de enlace principal (usado para el Contacto 1) */
+    .stLinkButton a[data-testid="baseLinkButton-primary"] {
+         background-color: #ff2d95; /* Rosa pánico */
+         color: #ffffff;
+         border: 1px solid #ffffff;
+    }
+    /* Botón de enlace secundario (usado para otros contactos) */
     .stLinkButton a[data-testid="baseLinkButton-secondary"] {
          background-color: #112d3c;
          color: #00f0ff;
@@ -228,7 +245,7 @@ st.markdown("""
 if 'panic_active' not in st.session_state:
     st.session_state.panic_active = False
 if 'contact_1' not in st.session_state:
-    st.session_state.contact_1 = "+51999888777" # Contacto Principal
+    st.session_state.contact_1 = "" # Contacto Principal
 if 'contact_2' not in st.session_state:
     st.session_state.contact_2 = "" # Contacto Secundario (Opcional)
 if 'contact_authority' not in st.session_state:
@@ -369,59 +386,61 @@ with tabs[0]:
         # Esta lógica SÓLO se ejecuta si gps_ready era True y el usuario hizo clic
             
         # --- CONSTRUIR LISTA DE CONTACTOS ---
-            contacts = [
-                st.session_state.contact_1,
-                st.session_state.contact_2,
-                st.session_state.contact_authority
-            ]
-            # Filtrar vacíos
-            contacts = [c for c in contacts if c and len(c) > 5]
+        contacts = [
+            st.session_state.contact_1,
+            st.session_state.contact_2,
+            st.session_state.contact_authority
+        ]
+        # Filtrar vacíos
+        contacts = [c for c in contacts if c and len(c) > 5]
 
-            # --- VERIFICAR SI HAY CONTACTOS ---
-            if not contacts:
-                placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
-            else:
-                # --- INICIO: LÓGICA DE 3 SEGUNDOS ---
-                try:
-                    with placeholder.container(): # Contenedor para la cuenta regresiva
-                        st.warning("Preparando alerta... 3 segundos")
-                        time.sleep(1)
-                        st.warning("Preparando alerta... 2 segundos")
-                        time.sleep(1)
-                        st.warning("Preparando alerta... 1 segundo")
-                        time.sleep(1)
+        # --- VERIFICAR SI HAY CONTACTOS ---
+        if not contacts:
+            placeholder.error("¡No hay contactos de emergencia! Ve a PERFIL para agregarlos.")
+        else:
+            # --- INICIO: LÓGICA DE 3 SEGUNDOS (CORREGIDA CON TRY...EXCEPT) ---
+            try:
+                with placeholder.container(): # Contenedor para la cuenta regresiva
+                    st.warning("Preparando alerta... 3 segundos")
+                    time.sleep(1)
+                    st.warning("Preparando alerta... 2 segundos")
+                    time.sleep(1)
+                    st.warning("Preparando alerta... 1 segundo")
+                    time.sleep(1)
+                
+                # --- OBTENER DATOS PARA MENSAJES ---
+                lat = st.session_state.location['lat']
+                lon = st.session_state.location['lon']
+                user_name = st.session_state.user_name
+                medical_info = st.session_state.medical_info
+                
+                # --- ¡LÓGICA DE ENVÍO MEJORADA! ---
+                with placeholder.container():
+                    st.success("¡ALERTA LISTA! PRESIONA PARA ENVIAR:")
                     
-                    # --- OBTENER DATOS PARA MENSAJES ---
-                    lat = st.session_state.location['lat']
-                    lon = st.session_state.location['lon']
-                    user_name = st.session_state.user_name
-                    medical_info = st.session_state.medical_info
-                    
-                    # --- ¡LÓGICA DE ENVÍO MEJORADA! ---
-                    with placeholder.container():
-                        st.success("¡ALERTA LISTA! PRESIONA PARA ENVIAR:")
-                        
-                        # Generar URL para Contacto 1
-                        url_1 = generate_whatsapp_url(st.session_state.contact_1, lat, lon, user_name, medical_info)
-                        if url_1:
-                            st.link_button(f"ENVIAR A CONTACTO 1 ({st.session_state.contact_1})", url_1, use_container_width=True, type="primary")
+                    # Generar URL para Contacto 1
+                    url_1 = generate_whatsapp_url(st.session_state.contact_1, lat, lon, user_name, medical_info)
+                    if url_1:
+                        st.link_button(f"ENVIAR A CONTACTO 1 ({st.session_state.contact_1})", url_1, use_container_width=True, type="primary")
 
-                        # Generar URL para Contacto 2
-                        url_2 = generate_whatsapp_url(st.session_state.contact_2, lat, lon, user_name, medical_info)
-                        if url_2:
-                            st.link_button(f"ENVIAR A CONTACTO 2 ({st.session_state.contact_2})", url_2, use_container_width=True, type="secondary")
+                    # Generar URL para Contacto 2
+                    url_2 = generate_whatsapp_url(st.session_state.contact_2, lat, lon, user_name, medical_info)
+                    if url_2:
+                        st.link_button(f"ENVIAR A CONTACTO 2 ({st.session_state.contact_2})", url_2, use_container_width=True, type="secondary")
 
-                        # Generar URL para Autoridad
-                        url_3 = generate_whatsapp_url(st.session_state.contact_authority, lat, lon, user_name, medical_info)
-                        if url_3:
-                            st.link_button(f"ENVIAR A AUTORIDAD ({st.session_state.contact_authority})", url_3, use_container_width=True, type="secondary")
-                    
-                    st.balloons()
+                    # Generar URL para Autoridad
+                    url_3 = generate_whatsapp_url(st.session_state.contact_authority, lat, lon, user_name, medical_info)
+                    if url_3:
+                        st.link_button(f"ENVIAR A AUTORIDAD ({st.session_state.contact_authority})", url_3, use_container_width=True, type="secondary")
+                
+                st.balloons()
 
-                placeholder.error("¡ERROR DE UBICACIÓN! No se puede enviar alerta sin GPS. Revisa los permisos.")
+            except Exception as e:
+                placeholder.error(f"Error al preparar envío: {e}")
+            # --- FIN: LÓGICA DE 3 SEGUNDOS ---
 
     # --- ¡NUEVO! ---
-    # Si el GPS no está listo, mostrar un error claro en lugar del botón
+    # Si el GPS no está listo, mostrar un error claro
     if not gps_ready:
         st.warning("El botón de pánico está desactivado. Esperando GPS FIJADO (verde) para activarse.")
 
